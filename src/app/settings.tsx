@@ -18,6 +18,7 @@ export default function SettingsScreen() {
   const { settings, stores } = state;
 
   const [token, setToken] = useState('');
+  const [rescan, setRescan] = useState<{ busy: boolean; message?: string }>({ busy: false });
   const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
@@ -25,6 +26,18 @@ export default function SettingsScreen() {
   }, []);
 
   const patch = (p: Parameters<typeof updateSettings>[1]) => mutate((s) => updateSettings(s, p));
+
+  // Forgets which lines were already read so the current extractor re-reads recent conversations.
+  const rescanConversations = async () => {
+    setRescan({ busy: true });
+    try {
+      await mutate((s) => ({ ...s, seenUtteranceIds: [] }));
+      const r = await syncFromBee();
+      setRescan({ busy: false, message: r.added.length ? `Added ${r.added.map((i) => i.name).join(', ')}.` : `Read ${r.processed} lines, nothing new to add.` });
+    } catch (e) {
+      setRescan({ busy: false, message: e instanceof Error ? e.message : 'Re-scan failed' });
+    }
+  };
 
   const saveToken = async () => {
     if (!token.trim()) return;
@@ -56,7 +69,7 @@ export default function SettingsScreen() {
 
         <SectionTitle>Bee wearable</SectionTitle>
         <Card>
-          <Text style={[styles.label, { color: t.text }]}>{hasToken ? 'Connected' : 'Not connected'}</Text>
+          <Text style={[styles.label, { color: t.text }]}>{hasToken || process.env.EXPO_PUBLIC_BEE_PROXY_URL ? 'Connected' : 'Not connected'}</Text>
           <TextInput
             value={token}
             onChangeText={setToken}
@@ -76,6 +89,10 @@ export default function SettingsScreen() {
                 onPress={() => void clearBeeToken().then(() => setHasToken(false))}
               />
             )}
+          </View>
+          <View style={{ marginTop: 10 }}>
+            <Button label={rescan.busy ? 'Re-scanning…' : 'Re-scan recent conversations'} kind="secondary" onPress={() => void rescanConversations()} disabled={rescan.busy} />
+            {rescan.message && <Muted style={{ marginTop: 6 }}>{rescan.message}</Muted>}
           </View>
         </Card>
         <Card>

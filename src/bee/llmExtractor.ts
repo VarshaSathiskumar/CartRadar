@@ -2,7 +2,9 @@ import { canonicalName } from '../core/lexicon';
 import type { ExtractedItem } from '../core/extractor';
 import type { Utterance } from '../core/types';
 
-const TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = 30_000;
+/** The service accepts at most 60 lines per request, so longer backlogs are sent in batches. */
+const BATCH_SIZE = 50;
 
 interface ServerItem {
   name: string;
@@ -13,12 +15,22 @@ interface ServerItem {
 /**
  * Asks the local extraction service (server/extract.ts) which items the speakers mean to buy.
  * Returns items grouped by the id of the utterance that evidences them, or undefined when the
- * service is not configured or fails, so the caller can fall back to the rule-based extractor.
+ * service is not configured or any batch fails, so the caller can fall back to the rule-based extractor.
  */
 export async function extractWithLlm(utterances: Utterance[]): Promise<Map<string, ExtractedItem[]> | undefined> {
   const url = process.env.EXPO_PUBLIC_EXTRACT_URL;
   if (!url || utterances.length === 0) return undefined;
 
+  const byUtterance = new Map<string, ExtractedItem[]>();
+  for (let i = 0; i < utterances.length; i += BATCH_SIZE) {
+    const batch = await extractBatch(url, utterances.slice(i, i + BATCH_SIZE));
+    if (!batch) return undefined;
+    for (const [id, items] of batch) byUtterance.set(id, items);
+  }
+  return byUtterance;
+}
+
+async function extractBatch(url: string, utterances: Utterance[]): Promise<Map<string, ExtractedItem[]> | undefined> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

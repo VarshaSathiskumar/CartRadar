@@ -67,8 +67,9 @@ export function recordHeard(
 ): PersistedState {
   return {
     ...state,
-    heard: [snippet, ...state.heard].slice(0, HEARD_CAP),
-    seenUtteranceIds: [...state.seenUtteranceIds, snippet.id].slice(-SEEN_CAP),
+    // A re-scan sees the same line again; keep one entry per utterance.
+    heard: [snippet, ...state.heard.filter((h) => h.id !== snippet.id)].slice(0, HEARD_CAP),
+    seenUtteranceIds: [...new Set([...state.seenUtteranceIds, snippet.id])].slice(-SEEN_CAP),
   };
 }
 

@@ -11,6 +11,7 @@ import {
   handleExit,
   mergeExtracted,
   openItems,
+  recordHeard,
   reminderText,
   toggleBought,
 } from './listLogic';
@@ -149,5 +150,16 @@ describe('groupHistoryByDay', () => {
 
   it('returns nothing for an empty history', () => {
     expect(groupHistoryByDay([])).toEqual([]);
+  });
+});
+
+describe('recordHeard', () => {
+  it('keeps one entry per utterance when the same line is seen again', () => {
+    const snippet = { id: 'u1', text: 'we need milk', at: NOW, found: ['milk'] };
+    const once = recordHeard(EMPTY_STATE, snippet);
+    const twice = recordHeard(once, { ...snippet, found: ['milk', 'eggs'] });
+    expect(twice.heard).toHaveLength(1);
+    expect(twice.heard[0].found).toEqual(['milk', 'eggs']);
+    expect(twice.seenUtteranceIds).toEqual(['u1']);
   });
 });
