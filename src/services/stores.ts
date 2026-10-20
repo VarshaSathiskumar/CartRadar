@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { buildAddress } from '../core/address';
 import { distanceMeters } from '../core/geo';
 import type { Store } from '../core/types';
 
@@ -30,16 +31,12 @@ interface OverpassElement {
   lat?: number;
   lon?: number;
   center?: { lat: number; lon: number };
-  tags?: { name?: string };
+  tags?: Record<string, string | undefined>;
 }
 
 /** Public Overpass servers, tried in order; each one is often at capacity, so none is relied on alone. */
-const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-];
-const OVERPASS_TIMEOUT_MS = 15_000;
+const OVERPASS_ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const OVERPASS_TIMEOUT_MS = 8_000;
 
 async function queryOverpass(query: string): Promise<OverpassElement[]> {
   for (const endpoint of OVERPASS_ENDPOINTS) {
@@ -59,21 +56,66 @@ async function queryOverpass(query: string): Promise<OverpassElement[]> {
       clearTimeout(timer);
     }
   }
-  throw new Error('The store search service is busy right now. Try again in a minute.');
+  throw new Error('Overpass is unavailable');
+}
+
+interface NominatimPlace {
+  osm_type: string;
+  osm_id: number;
+  lat: string;
+  lon: string;
+  name?: string;
+  address?: Record<string, string | undefined>;
+}
+
+/** Backup source when Overpass is down: OpenStreetMap's own search, which also returns addresses. */
+async function queryNominatim(centre: { latitude: number; longitude: number }): Promise<Store[]> {
+  const d = 0.07; // about 8 km each way
+  const viewbox = [centre.longitude - d, centre.latitude + d, centre.longitude + d, centre.latitude - d].join(',');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=supermarket&format=jsonv2&addressdetails=1&limit=40&bounded=1&viewbox=${viewbox}`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Nominatim ${res.status}`);
+    const places = (await res.json()) as NominatimPlace[];
+    return places.flatMap((p) => {
+      if (!p.name) return [];
+      const a = p.address ?? {};
+      const address = buildAddress({
+        'addr:housenumber': a.house_number,
+        'addr:street': a.road,
+        'addr:city': a.city ?? a.town ?? a.village ?? a.hamlet,
+        'addr:state': a.state,
+        'addr:postcode': a.postcode,
+      });
+      return [{ id: `${p.osm_type}/${p.osm_id}`, name: p.name, address, latitude: Number(p.lat), longitude: Number(p.lon), enabled: true }];
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Finds grocery stores near a point using OpenStreetMap data (no API key needed). */
 export async function findGroceryStores(centre: { latitude: number; longitude: number }, radiusM = 5000): Promise<Store[]> {
   const q = `[out:json][timeout:25];(nwr["shop"~"^(supermarket|grocery|wholesale)$"](around:${radiusM},${centre.latitude},${centre.longitude}););out center 60;`;
-  const elements = await queryOverpass(q);
 
-  const stores: Store[] = [];
-  for (const el of elements) {
-    const latitude = el.lat ?? el.center?.lat;
-    const longitude = el.lon ?? el.center?.lon;
-    const name = el.tags?.name;
-    if (latitude === undefined || longitude === undefined || !name) continue;
-    stores.push({ id: `${el.type}/${el.id}`, name, latitude, longitude, enabled: true });
+  let stores: Store[] = [];
+  try {
+    for (const el of await queryOverpass(q)) {
+      const latitude = el.lat ?? el.center?.lat;
+      const longitude = el.lon ?? el.center?.lon;
+      const name = el.tags?.name;
+      if (latitude === undefined || longitude === undefined || !name) continue;
+      stores.push({ id: `${el.type}/${el.id}`, name, address: buildAddress(el.tags), latitude, longitude, enabled: true });
+    }
+  } catch {
+    try {
+      stores = await queryNominatim(centre);
+    } catch {
+      throw new Error('The store search service is busy right now. Try again in a minute.');
+    }
   }
   return stores
     .sort((a, b) => distanceMeters(centre, a) - distanceMeters(centre, b))

@@ -27,9 +27,10 @@ export default function ListScreen() {
 
   const { user } = useAuth();
   const { coords, status: locationStatus } = useUserLocation();
-  const nearby = useNearbyStores(state.stores.length ? undefined : coords);
-  // Stores chosen in Location settings win; before any are set, show what is around the device.
-  const mapStores = state.stores.length ? state.stores : nearby;
+  // Device-based lookup only until a zip is chosen; after that the map belongs to the zip area.
+  const usingDevice = !state.settings.zip && !state.settings.centre;
+  const nearby = useNearbyStores(state.stores.length || !usingDevice ? undefined : coords);
+  const mapStores = state.stores.length ? state.stores : usingDevice ? nearby : [];
   // A zip code from Location settings moves the map there instead of to the device position.
   // Settings saved before the centre was stored fall back to the middle of the saved stores.
   const zipCentre =

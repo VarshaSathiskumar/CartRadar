@@ -47,6 +47,8 @@ export interface Settings {
 export interface Store {
   id: string;
   name: string;
+  /** Street address when OpenStreetMap has one; many stores are mapped without it. */
+  address?: string;
   latitude: number;
   longitude: number;
   enabled: boolean;

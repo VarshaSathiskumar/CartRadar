@@ -1,13 +1,15 @@
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../components/theme';
 import { Button, Card, Chip, Muted, SectionTitle, Toggle } from '../components/ui';
+import { distanceMeters, formatMiles, googleMapsDirectionsUrl } from '../core/geo';
 import { setStores, toggleStore, updateSettings } from '../core/listLogic';
 import type { Store } from '../core/types';
 import { syncGeofences, type GeofenceStatus } from '../services/geofence';
+import { useUserLocation } from '../services/location';
 import { requestNotificationPermission } from '../services/notifications';
 import { mutate, useAppState } from '../services/store';
 import { findGroceryStores, geocodeZip } from '../services/stores';
@@ -26,9 +28,18 @@ export default function LocationScreen() {
   const { state } = useAppState();
   const { settings, stores } = state;
 
+  const { coords } = useUserLocation();
+  // Distances are measured from the device when it has a position, otherwise from the searched zip area.
+  const origin = coords ?? settings.centre;
+  const withDistance = stores
+    .map((st) => ({ st, meters: origin ? distanceMeters(origin, st) : undefined }))
+    .sort((a, b) => (a.meters ?? 0) - (b.meters ?? 0));
+
   const [zip, setZip] = useState(settings.zip);
   const [busy, setBusy] = useState<'zip' | 'gps' | undefined>();
   const [geoStatus, setGeoStatus] = useState<GeofenceStatus | undefined>();
+  // Shown inline: Alert.alert does nothing in the browser, where errors would otherwise be invisible.
+  const [error, setError] = useState<string | undefined>();
 
   // Region monitoring only exists on phones, so the browser skips notifications and geofences.
   const refreshGeofences = async () => {
@@ -43,10 +54,11 @@ export default function LocationScreen() {
 
   const run = async (kind: 'zip' | 'gps', fn: () => Promise<void>) => {
     setBusy(kind);
+    setError(undefined);
     try {
       await fn();
     } catch (e) {
-      Alert.alert('Couldn’t set up stores', e instanceof Error ? e.message : 'Unknown error');
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setBusy(undefined);
     }
@@ -55,7 +67,15 @@ export default function LocationScreen() {
   const findByZip = () =>
     run('zip', async () => {
       const centre = await geocodeZip(zip);
-      const found = await findGroceryStores(centre);
+      // Move to the new zip right away so the map follows even if the store search is slow or fails.
+      // The old stores belong to the old area, so they go too (a re-search of the same zip keeps them and their toggles).
+      if (zip.trim() !== settings.zip) await mutate((s) => setStores(updateSettings(s, { zip: zip.trim(), centre }), []));
+      let found: Store[];
+      try {
+        found = await findGroceryStores(centre);
+      } catch (e) {
+        throw new Error(`Moved to ${zip.trim()}, but stores didn’t load. ${e instanceof Error ? e.message : ''} Tap “Find stores by zip” to retry.`);
+      }
       if (found.length === 0) throw new Error('No grocery stores found near that zip code');
       await apply(centre, zip.trim(), found);
     });
@@ -102,6 +122,7 @@ export default function LocationScreen() {
             <Button label={busy === 'zip' ? 'Searching…' : 'Find stores by zip'} onPress={() => void findByZip()} disabled={!!busy || zip.length !== 5} />
             <Button label={busy === 'gps' ? 'Locating…' : 'Use my current location'} kind="secondary" onPress={() => void findHere()} disabled={!!busy} />
           </View>
+          {error && <Text style={{ color: t.danger, fontWeight: '600', marginTop: 8 }}>{error}</Text>}
           {geoStatus && <Muted style={{ marginTop: 8 }}>{statusMessage[geoStatus]}</Muted>}
         </Card>
 
@@ -111,9 +132,14 @@ export default function LocationScreen() {
             <Muted>No stores yet. Search by zip code or use your current location.</Muted>
           </Card>
         )}
-        {stores.map((st) => (
+        {origin && stores.length > 0 && <Muted style={styles.originNote}>{coords ? 'Distances from your current location' : `Distances from ${settings.zip || 'your search area'}`}</Muted>}
+        {withDistance.map(({ st, meters }) => (
           <Card key={st.id}>
-            <Toggle title={st.name} value={st.enabled} onChange={() => void mutate((s) => toggleStore(s, st.id)).then(refreshGeofences)} />
+            <Toggle title={st.name} description={st.address ?? 'Address not listed'} value={st.enabled} onChange={() => void mutate((s) => toggleStore(s, st.id)).then(refreshGeofences)} />
+            <View style={styles.storeFooter}>
+              <Text style={{ color: t.muted, fontSize: 13, fontWeight: '600' }}>{meters === undefined ? '' : `📍 ${formatMiles(meters)} away`}</Text>
+              <Button label="Directions" kind="secondary" onPress={() => void Linking.openURL(googleMapsDirectionsUrl(st))} />
+            </View>
           </Card>
         ))}
 
@@ -140,4 +166,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800' },
   input: { borderWidth: 1, borderRadius: 10, padding: 10, fontSize: 16, marginBottom: 10 },
   rowGap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  originNote: { marginHorizontal: 20, marginBottom: 8 },
+  storeFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
 });
