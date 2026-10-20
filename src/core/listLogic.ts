@@ -220,3 +220,22 @@ export function tripText(t: TripOutcome & { store: Store }, providerLabel: strin
   }
   return undefined;
 }
+
+export interface HistoryDay {
+  /** Local midnight of the day the items were checked out. */
+  dayStart: number;
+  items: ListItem[];
+}
+
+/** Checked-out items grouped by the local day they were resolved, newest day first. */
+export function groupHistoryByDay(history: ListItem[]): HistoryDay[] {
+  const days = new Map<number, ListItem[]>();
+  for (const item of history) {
+    const d = new Date(item.resolvedAt ?? item.addedAt);
+    d.setHours(0, 0, 0, 0);
+    const list = days.get(d.getTime()) ?? [];
+    list.push(item);
+    days.set(d.getTime(), list);
+  }
+  return [...days.entries()].sort((a, b) => b[0] - a[0]).map(([dayStart, items]) => ({ dayStart, items }));
+}

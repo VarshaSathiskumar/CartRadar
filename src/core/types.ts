@@ -29,6 +29,8 @@ export type CartProviderId = 'amazon-fresh' | 'instacart' | 'walmart';
 
 export interface Settings {
   zip: string;
+  /** Where the zip code (or the current position) was resolved to; the map opens here. */
+  centre?: { latitude: number; longitude: number };
   /** Geofence radius around each store, in metres. */
   geofenceRadiusM: number;
   /**

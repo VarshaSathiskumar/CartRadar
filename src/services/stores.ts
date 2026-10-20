@@ -33,19 +33,42 @@ interface OverpassElement {
   tags?: { name?: string };
 }
 
+/** Public Overpass servers, tried in order; each one is often at capacity, so none is relied on alone. */
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
+const OVERPASS_TIMEOUT_MS = 15_000;
+
+async function queryOverpass(query: string): Promise<OverpassElement[]> {
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: controller.signal,
+      });
+      if (res.ok) return ((await res.json()) as { elements: OverpassElement[] }).elements;
+    } catch {
+      // timed out or unreachable: try the next server
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error('The store search service is busy right now. Try again in a minute.');
+}
+
 /** Finds grocery stores near a point using OpenStreetMap data (no API key needed). */
-export async function findGroceryStores(centre: { latitude: number; longitude: number }, radiusM = 8000): Promise<Store[]> {
+export async function findGroceryStores(centre: { latitude: number; longitude: number }, radiusM = 5000): Promise<Store[]> {
   const q = `[out:json][timeout:25];(nwr["shop"~"^(supermarket|grocery|wholesale)$"](around:${radiusM},${centre.latitude},${centre.longitude}););out center 60;`;
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(q)}`,
-  });
-  if (!res.ok) throw new Error(`Store search failed (${res.status})`);
-  const json = (await res.json()) as { elements: OverpassElement[] };
+  const elements = await queryOverpass(q);
 
   const stores: Store[] = [];
-  for (const el of json.elements) {
+  for (const el of elements) {
     const latitude = el.lat ?? el.center?.lat;
     const longitude = el.lon ?? el.center?.lon;
     const name = el.tags?.name;

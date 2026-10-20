@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from './theme';
 
@@ -71,7 +71,21 @@ export function Muted({ children, style }: { children: ReactNode; style?: object
   return <Text style={[{ color: t.muted, fontSize: 13, lineHeight: 18 }, style]}>{children}</Text>;
 }
 
+export function Toggle({ title, description, value, onChange }: { title: string; description?: string; value: boolean; onChange: (v: boolean) => void }) {
+  const t = useTheme();
+  return (
+    <View style={s.toggle}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: t.text, fontSize: 16, fontWeight: '600', marginBottom: 4 }}>{title}</Text>
+        {description && <Muted>{description}</Muted>}
+      </View>
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: t.accent }} />
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
   title: { fontSize: 28, fontWeight: '800' },

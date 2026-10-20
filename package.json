@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo/metro-runtime": "~58.0.14",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "~58.0.16",
     "expo-background-task": "~58.0.11",
@@ -16,14 +17,21 @@
     "expo-status-bar": "~58.0.3",
     "expo-system-ui": "~58.0.6",
     "expo-task-manager": "~58.0.12",
+    "openai": "^7.39.0",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "^19.3.0",
     "react-native": "0.88.0",
+    "react-native-maps": "1.29.11",
     "react-native-safe-area-context": "~5.10.1",
-    "react-native-screens": "~4.30.0"
+    "react-native-screens": "~4.30.0",
+    "react-native-web": "^0.21.4"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "@types/pg": "^8.23.1",
     "@types/react": "~19.3.0",
+    "leaflet": "^1.9.4",
     "typescript": "~6.0.3",
     "vitest": "^5.0.5"
   },
@@ -33,7 +41,10 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "extract": "node --env-file-if-exists=.env.local server/extract.ts",
+    "auth": "node --env-file-if-exists=.env.local server/auth.ts",
+    "check-sample": "node --env-file-if-exists=.env.local server/check-sample.ts"
   },
   "private": true
 }

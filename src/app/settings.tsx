@@ -1,43 +1,30 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { syncFromBee } from '../bee/sync';
+import { useAuth } from '../components/AuthProvider';
 import { useTheme } from '../components/theme';
-import { Button, Card, Chip, Muted, Screen, SectionTitle } from '../components/ui';
-import { setStores, toggleStore, updateSettings } from '../core/listLogic';
+import { Button, Card, Chip, Muted, Screen, SectionTitle, Toggle } from '../components/ui';
+import { updateSettings } from '../core/listLogic';
 import type { CartProviderId } from '../core/types';
 import { CART_PROVIDERS } from '../services/cart';
-import { syncGeofences, type GeofenceStatus } from '../services/geofence';
-import { requestNotificationPermission } from '../services/notifications';
 import { clearBeeToken, getBeeToken, setBeeToken } from '../services/secrets';
 import { mutate, useAppState } from '../services/store';
-import { findGroceryStores, geocodeZip } from '../services/stores';
-
-const RADII = [150, 250, 500];
-
-const statusMessage: Record<GeofenceStatus, string> = {
-  active: 'Watching for stores',
-  'no-stores': 'No stores selected',
-  'foreground-denied': 'Location permission denied. Enable it in system settings.',
-  'background-denied': 'Choose “Always” for location so reminders work when the app is closed.',
-};
 
 export default function SettingsScreen() {
   const t = useTheme();
   const { state } = useAppState();
+  const { user, signOut } = useAuth();
   const { settings, stores } = state;
 
   const [token, setToken] = useState('');
   const [hasToken, setHasToken] = useState(false);
-  const [zip, setZip] = useState(settings.zip);
-  const [busy, setBusy] = useState(false);
-  const [geoStatus, setGeoStatus] = useState<GeofenceStatus | undefined>();
 
   useEffect(() => {
     void getBeeToken().then((v) => setHasToken(!!v));
   }, []);
 
   const patch = (p: Parameters<typeof updateSettings>[1]) => mutate((s) => updateSettings(s, p));
-  const refreshGeofences = async () => setGeoStatus(await syncGeofences());
 
   const saveToken = async () => {
     if (!token.trim()) return;
@@ -52,25 +39,21 @@ export default function SettingsScreen() {
     }
   };
 
-  const findStores = async () => {
-    setBusy(true);
-    try {
-      const centre = await geocodeZip(zip);
-      const found = await findGroceryStores(centre);
-      if (found.length === 0) throw new Error('No grocery stores found near that zip code');
-      await mutate((s) => setStores(updateSettings(s, { zip: zip.trim() }), found));
-      await requestNotificationPermission();
-      await refreshGeofences();
-    } catch (e) {
-      Alert.alert('Couldn’t set up stores', e instanceof Error ? e.message : 'Unknown error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <Screen title="Settings">
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        {user && (
+          <>
+            <SectionTitle>Account</SectionTitle>
+            <Card>
+              {user.name && <Text style={[styles.label, { color: t.text }]}>{user.name}</Text>}
+              <Muted>{user.email}</Muted>
+              <Muted style={{ marginBottom: 10 }}>{user.mobile}</Muted>
+              <Button label="Sign out" kind="secondary" onPress={() => void signOut()} />
+            </Card>
+          </>
+        )}
+
         <SectionTitle>Bee wearable</SectionTitle>
         <Card>
           <Text style={[styles.label, { color: t.text }]}>{hasToken ? 'Connected' : 'Not connected'}</Text>
@@ -104,35 +87,20 @@ export default function SettingsScreen() {
           />
         </Card>
 
-        <SectionTitle>Where you shop</SectionTitle>
-        <Card>
-          <TextInput
-            value={zip}
-            onChangeText={setZip}
-            placeholder="Zip code"
-            placeholderTextColor={t.muted}
-            keyboardType="number-pad"
-            maxLength={5}
-            style={[styles.input, { color: t.text, borderColor: t.border }]}
-          />
-          <Button label={busy ? 'Searching…' : stores.length ? 'Refresh nearby stores' : 'Find nearby stores'} onPress={() => void findStores()} disabled={busy || zip.length !== 5} />
-          {geoStatus && <Muted style={{ marginTop: 8 }}>{statusMessage[geoStatus]}</Muted>}
-        </Card>
-        {stores.map((st) => (
-          <Card key={st.id}>
-            <Toggle title={st.name} value={st.enabled} onChange={() => void mutate((s) => toggleStore(s, st.id)).then(refreshGeofences)} />
-          </Card>
-        ))}
-        {stores.length > 0 && (
-          <Card>
-            <Text style={[styles.label, { color: t.text }]}>Remind me within</Text>
-            <View style={styles.rowGap}>
-              {RADII.map((r) => (
-                <Chip key={r} label={`${r} m`} selected={settings.geofenceRadiusM === r} onPress={() => void patch({ geofenceRadiusM: r }).then(refreshGeofences)} />
-              ))}
+        <SectionTitle>Location</SectionTitle>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/location')}>
+          <Card style={styles.linkRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.label, { color: t.text }]}>Zip code and stores</Text>
+              <Muted>
+                {stores.length
+                  ? `${settings.zip ? `Near ${settings.zip}` : 'Near your current location'} · ${stores.filter((st) => st.enabled).length} of ${stores.length} stores on`
+                  : 'Not set up yet'}
+              </Muted>
             </View>
+            <Text style={{ color: t.muted, fontSize: 22 }}>›</Text>
           </Card>
-        )}
+        </Pressable>
 
         <SectionTitle>Reminders</SectionTitle>
         <Card>
@@ -172,22 +140,9 @@ export default function SettingsScreen() {
   );
 }
 
-function Toggle({ title, description, value, onChange }: { title: string; description?: string; value: boolean; onChange: (v: boolean) => void }) {
-  const t = useTheme();
-  return (
-    <View style={styles.toggle}>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.label, { color: t.text }]}>{title}</Text>
-        {description && <Muted>{description}</Muted>}
-      </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: t.accent }} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
   input: { borderWidth: 1, borderRadius: 10, padding: 10, fontSize: 16, marginBottom: 10 },
   rowGap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 });

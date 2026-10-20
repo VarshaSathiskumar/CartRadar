@@ -20,14 +20,14 @@ export class BeeAuthError extends Error {}
  */
 export class HttpBeeClient implements BeeClient {
   constructor(
-    private readonly token: string,
+    private readonly token: string | undefined,
     private readonly baseUrl = 'https://api.bee.computer',
     private readonly conversationLimit = 10,
   ) {}
 
   private async get(path: string): Promise<unknown> {
     const res = await fetch(`${this.baseUrl}${path}`, {
-      headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json' },
+      headers: { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), Accept: 'application/json' },
     });
     if (res.status === 401 || res.status === 403) throw new BeeAuthError('Bee rejected the access token');
     if (!res.ok) throw new Error(`Bee request failed (${res.status})`);
@@ -55,7 +55,9 @@ type Raw = Record<string, unknown>;
 
 function findUtterances(c: Raw): Raw[] | undefined {
   const candidate = c.utterances ?? c.transcriptions ?? c.transcript;
-  return Array.isArray(candidate) ? (candidate as Raw[]) : undefined;
+  if (!Array.isArray(candidate)) return undefined;
+  // Bee nests utterances inside transcription objects: transcriptions[].utterances[].
+  return (candidate as Raw[]).flatMap((entry) => (Array.isArray(entry.utterances) ? (entry.utterances as Raw[]) : [entry]));
 }
 
 const asTime = (...values: unknown[]): number | undefined => {

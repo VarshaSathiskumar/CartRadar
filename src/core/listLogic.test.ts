@@ -6,6 +6,7 @@ import {
   REBUY_SUPPRESS_MS,
   clearQueued,
   finishTrip,
+  groupHistoryByDay,
   handleEnter,
   handleExit,
   mergeExtracted,
@@ -131,5 +132,22 @@ describe('reminderText', () => {
     const { title, body } = reminderText(store, s.items);
     expect(title).toBe("You're near Kroger");
     expect(body).toBe('7 items to pick up: eggs, milk, bread, rice, butter +2 more');
+  });
+});
+
+describe('groupHistoryByDay', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const bought = (name: string, resolvedAt: number) => ({ ...add(EMPTY_STATE, `we need ${name}`).items[0], status: 'bought' as const, resolvedAt });
+
+  it('groups by local day, newest first', () => {
+    // Local noon keeps the same-day pair clear of midnight in any timezone.
+    const noon = new Date(NOW).setHours(12, 0, 0, 0);
+    const groups = groupHistoryByDay([bought('eggs', noon), bought('milk', noon - 3 * DAY), bought('bread', noon - 10_000)]);
+    expect(groups.map((g) => g.items.map((i) => i.name))).toEqual([['eggs', 'bread'], ['milk']]);
+    expect(groups[0].dayStart).toBeGreaterThan(groups[1].dayStart);
+  });
+
+  it('returns nothing for an empty history', () => {
+    expect(groupHistoryByDay([])).toEqual([]);
   });
 });
