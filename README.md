@@ -118,6 +118,37 @@ Users can also manually complete a shopping trip using **Finish trip**.
 
 No items are automatically deleted.
 
+
+## 🐝 How Live Bee Data Reaches CartRadar
+
+⚡ 1. Automatic Synchronization
+
+CartRadar automatically syncs Bee conversations when users sign in, open the app, or return to it. It also polls every 5 minutes while the app is open and supports manual refresh and OS-scheduled background synchronization.
+
+🔗 2. Secure Bee Integration
+
+The bee-sync Supabase Edge Function securely retrieves live conversations through Bee’s Developer API using GET /v1/conversations and GET /v1/conversations/:id.
+
+The Bee authentication token stays in Supabase secrets and is never exposed to the mobile application.
+
+🧠 3. AI-Powered Extraction
+
+The extract-items Edge Function uses OpenAI to identify grocery items, understand purchase intent, and resolve contextual references such as “buy it.”
+
+A rule-based extractor provides a fallback for users without a cloud account.
+
+🛒 4. Smart Shopping List
+
+Extracted items are automatically added to the shopping list, along with the original conversation phrase. CartRadar prevents duplicates and tracks purchased items.
+
+📍 5. Location-Based Reminders
+
+CartRadar detects nearby grocery stores using native geofencing or foreground location checks on the web.
+
+When users approach a store with pending grocery items, CartRadar can send a reminder.
+
+After a shopping trip, unfinished items can remain on the list or move to the Cart queue for shopping through Amazon Fresh.
+
 ## Technical Architecture
 
 ```text
