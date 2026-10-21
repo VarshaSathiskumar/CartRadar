@@ -45,3 +45,7 @@ yarn-error.*
 
 # Edge Function secrets (pushed with `supabase secrets set`)
 supabase/functions/.env
+
+# Saved Bee transcripts and local Supabase CLI state
+data/
+supabase/.temp/
