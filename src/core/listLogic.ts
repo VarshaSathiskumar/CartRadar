@@ -232,10 +232,12 @@ export function orderQueuedItem(state: PersistedState, id: string, now: number):
 }
 
 /** `others` is how many more stores are nearby at the same time; they share this one reminder. */
-export function reminderText(store: Store, others = 0): { title: string; body: string } {
+export function reminderText(store: Store, others = 0, items: ListItem[] = []): { title: string; body: string } {
+  const names = items.map((i) => i.name);
+  const more = names.length > 4 ? ` +${names.length - 4} more` : '';
   return {
     title: `You're near ${store.name}${others > 0 ? ` + ${others} ${others === 1 ? 'other' : 'others'}` : ''}`,
-    body: "Don't forget to pick up your grocery items.",
+    body: names.length ? `Pick up: ${names.slice(0, 4).join(', ')}${more}.` : "Don't forget to pick up your grocery items.",
   };
 }
 

@@ -52,7 +52,7 @@ async function onPosition(pos: GeolocationPosition) {
     const now = Date.now();
     set({
       // Stores reached by the same fix share one reminder.
-      reminders: [{ key: `nearby:${now}`, ...reminderText(found[0].store, found.length - 1) }],
+      reminders: [{ key: `nearby:${now}`, ...reminderText(found[0].store, found.length - 1, found[0].items) }],
     });
   } finally {
     busy = false;

@@ -34,7 +34,7 @@ TaskManager?.defineTask<{ eventType: Location.GeofencingEventType; region: Locat
         return { state: nearby?.state ?? d.state, result: { ...d, others: nearby?.others.length ?? 0 } };
       });
       if (decision?.reminder) {
-        const { title, body } = reminderText(decision.reminder.store, decision.others);
+        const { title, body } = reminderText(decision.reminder.store, decision.others, decision.reminder.items);
         await notifyNow(title, body, { screen: 'list' });
       }
     } else if (data.eventType === Location.GeofencingEventType.Exit) {

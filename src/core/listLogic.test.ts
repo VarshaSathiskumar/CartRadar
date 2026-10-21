@@ -190,10 +190,16 @@ describe('orderQueuedItem', () => {
 });
 
 describe('reminderText', () => {
-  it('names the store without listing items', () => {
+  it('names the store and falls back to a generic body without items', () => {
     const { title, body } = reminderText(store);
     expect(title).toBe("You're near Kroger");
     expect(body).toBe("Don't forget to pick up your grocery items.");
+  });
+
+  it('lists the items on the list, capped at four', () => {
+    const items = add(EMPTY_STATE, 'we need milk, eggs, bread, rice, noodles and cheese').items;
+    expect(reminderText(store, 0, items.slice(0, 3)).body).toBe('Pick up: milk, eggs, bread.');
+    expect(reminderText(store, 0, items).body).toMatch(/^Pick up: .+ \+2 more\.$/);
   });
 
   it('combines nearby stores into one title', () => {
