@@ -1,16 +1,18 @@
 import { Tabs, router } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, AppState, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Platform, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { syncFromBee } from '../bee/sync';
 import { AuthProvider, useAuth } from '../components/AuthProvider';
 import { AppShell } from '../components/AppShell';
+import { ReminderBanner } from '../components/ReminderBanner';
 import { queueItems, queuedItems } from '../core/listLogic';
 import { useTheme } from '../components/theme';
 import { registerBackgroundSync } from '../services/background';
 import '../services/geofence'; // registers the geofence task with the OS
 import { configureNotifications, KEEP_ON_LIST_ACTION, MOVE_TO_CART_ACTION, onNotificationResponse } from '../services/notifications';
 import { loadState, mutate, useAppState } from '../services/store';
+import { startWebReminders, stopWebReminders } from '../services/webReminders';
 
 configureNotifications();
 
@@ -69,6 +71,19 @@ function AppTabs() {
     };
   }, [status]);
 
+  // Web has no background geofencing, so while the page is visible and the feature is on, the browser position is watched.
+  const remindersOn = state.settings.remindersEnabled;
+  useEffect(() => {
+    if (Platform.OS !== 'web' || status !== 'signedIn' || !remindersOn) return;
+    const sync = () => (document.visibilityState === 'visible' ? startWebReminders() : stopWebReminders());
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      document.removeEventListener('visibilitychange', sync);
+      stopWebReminders();
+    };
+  }, [status, remindersOn]);
+
   if (status === 'loading') {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.bg }}>
@@ -79,6 +94,7 @@ function AppTabs() {
 
   return (
     <SafeAreaProvider>
+      <ReminderBanner />
       <Tabs
         screenOptions={{
           headerShown: false,

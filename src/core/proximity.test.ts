@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest';
+import { NOTIFY_COOLDOWN_MS } from './listLogic';
+import { checkProximity, WEB_REMINDER_RADIUS_M as R } from './proximity';
+import { EMPTY_STATE } from './types';
+import type { ListItem, PersistedState, Store } from './types';
+
+const store: Store = { id: 's1', name: 'Market', latitude: 40, longitude: -74, enabled: true } as Store;
+const item = { id: 'i1', name: 'eggs', canonical: 'egg', status: 'open', source: 'manual', addedAt: 0, carriedOver: 0 } as ListItem;
+const base: PersistedState = { ...EMPTY_STATE, stores: [store], items: [item] };
+const at = (metres: number) => ({ latitude: 40 + metres / 111_320, longitude: -74 });
+
+describe('checkProximity', () => {
+  it('reminds once on entering 5 miles, not before', () => {
+    expect(checkProximity(base, at(R + 100), new Set(), 1).reminders).toHaveLength(0);
+    const r = checkProximity(base, at(R - 50), new Set(), 1);
+    expect(r.reminders).toHaveLength(1);
+    expect(r.state.lastNotifiedAt.s1).toBe(1);
+    expect(checkProximity(r.state, at(R / 2), r.inside, 2).reminders).toHaveLength(0);
+  });
+
+  it('does not repeat when GPS jitters at the edge', () => {
+    const r = checkProximity(base, at(R - 10), new Set(), 1);
+    const out = checkProximity(r.state, at(R + 30), r.inside, NOTIFY_COOLDOWN_MS + 5);
+    expect(out.inside.has('s1')).toBe(true);
+    expect(out.reminders).toHaveLength(0);
+  });
+
+  it('respects the cooldown, then reminds again after leaving and returning', () => {
+    const r = checkProximity(base, at(R / 2), new Set(), 1);
+    const left = checkProximity(r.state, at(R + 500), r.inside, 2);
+    expect(checkProximity(left.state, at(R / 2), left.inside, 3).reminders).toHaveLength(0);
+    expect(checkProximity(left.state, at(R / 2), left.inside, NOTIFY_COOLDOWN_MS + 2).reminders).toHaveLength(1);
+  });
+
+  it('skips disabled stores and empty lists', () => {
+    expect(checkProximity({ ...base, stores: [{ ...store, enabled: false }] }, at(10), new Set(), 1).reminders).toHaveLength(0);
+    expect(checkProximity({ ...base, items: [] }, at(10), new Set(), 1).reminders).toHaveLength(0);
+  });
+});

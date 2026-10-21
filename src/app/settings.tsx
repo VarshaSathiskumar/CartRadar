@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { syncFromBee } from '../bee/sync';
 import { useSyncStatus } from '../bee/syncStatus';
 import { useAuth } from '../components/AuthProvider';
@@ -9,6 +9,7 @@ import { Button, Card, Muted, Screen, SectionTitle, Toggle } from '../components
 import { updateSettings } from '../core/listLogic';
 import { disableDemo, enableDemo } from '../services/demo';
 import { mutate, useAppState } from '../services/store';
+import { useWebReminders } from '../services/webReminders';
 
 export default function SettingsScreen() {
   const t = useTheme();
@@ -17,6 +18,7 @@ export default function SettingsScreen() {
   const { settings, stores } = state;
 
   const sync = useSyncStatus();
+  const webReminders = useWebReminders();
   const [demo, setDemo] = useState<{ busy: boolean; message?: string }>({ busy: false });
 
   const patch = (p: Parameters<typeof updateSettings>[1]) => mutate((s) => updateSettings(s, p));
@@ -106,6 +108,14 @@ export default function SettingsScreen() {
             value={settings.remindersEnabled}
             onChange={(v) => void patch({ remindersEnabled: v })}
           />
+          {Platform.OS === 'web' && settings.remindersEnabled && (
+            <Muted style={{ marginTop: 8 }}>
+              {webReminders.status === 'tracking' && 'Checking your location while this page is open. You will see a reminder within 5 miles of a saved store.'}
+              {webReminders.status === 'denied' && 'Location is blocked. Allow it for this site in your browser settings (iPhone: Settings, Safari, Location), then reload.'}
+              {webReminders.status === 'unavailable' && 'This browser cannot share your location.'}
+              {webReminders.status === 'off' && 'Waiting for location permission. Reminders only appear while this page is open.'}
+            </Muted>
+          )}
         </Card>
 
         <SectionTitle>Items I didn’t buy</SectionTitle>
