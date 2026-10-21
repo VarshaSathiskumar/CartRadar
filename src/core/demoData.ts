@@ -1,6 +1,6 @@
 import { DEMO_CONVERSATIONS, type DemoConversation } from './demoConversations';
 import type { ExtractedItem } from './extractor';
-import { markSeen, mergeExtracted, queueItems, recordHeard } from './listLogic';
+import { dismissNotNeeded, markSeen, mergeExtracted, queueItems, recordHeard } from './listLogic';
 import type { ListItem, PersistedState, Utterance } from './types';
 
 /** Everything demo mode creates (items, spoken lines) has an id starting with this, so turning it off can find it. */
@@ -62,7 +62,9 @@ export function applyDemoConversation(
       continue;
     }
     const merged = mergeExtracted(next, found, 'bee', u.at, newId);
-    next = recordHeard(merged.state, { id: u.id, text: u.text, at: u.at, found: found.map((f) => f.name) });
+    // A later line can take an earlier line's item off the list again, like a real sync does.
+    const dismissed = dismissNotNeeded(merged.state, found.filter((f) => f.notNeeded), u.at);
+    next = recordHeard(dismissed.state, { id: u.id, text: u.text, at: u.at, found: found.map((f) => (f.notNeeded ? `${f.name} (not needed)` : f.name)) });
     added.push(...merged.added);
   }
   if (added.length === 0) return next;

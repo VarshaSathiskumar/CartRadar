@@ -27,6 +27,8 @@ export interface DemoConversation {
   expect: string[];
   /** Things said in the conversation that must NOT end up on the list. */
   avoid: string[];
+  /** Items from earlier conversations that this one says are not needed after all, so a good reading takes them off the list. */
+  notNeeded?: string[];
 }
 
 export const DEMO_CONVERSATIONS: DemoConversation[] = [
@@ -194,5 +196,33 @@ export const DEMO_CONVERSATIONS: DemoConversation[] = [
     ],
     expect: ['salmon', 'asparagus', 'ice cream'],
     avoid: ['rice'],
+  },
+  {
+    id: 'low-on-butter',
+    when: { daysAgo: 2, hour: 19 },
+    fate: { kind: 'open' },
+    lines: [
+      ['Speaker 1', 'I am starting the casserole. Are we out of butter?'],
+      ['Speaker 2', 'I think we are almost out. Put butter on the list. And sharp cheddar, the big block.'],
+      ['Speaker 1', 'Got it. Can you hand me that dish?'],
+      ['Speaker 2', 'Here. Did the plumber ever call you back?'],
+      ['Speaker 1', 'Not yet, I will try him again Thursday.'],
+    ],
+    expect: ['butter', 'cheddar'],
+    avoid: ['plumber'],
+  },
+  {
+    id: 'butter-found',
+    when: { daysAgo: 1, hour: 18 },
+    fate: { kind: 'open' },
+    lines: [
+      ['Speaker 1', 'Hey honey, I found two more sticks of butter in the back of the fridge.'],
+      ['Speaker 2', 'Oh nice, so the butter will last us another week, no need to buy it.'],
+      ['Speaker 1', 'Right. We still need the cheddar though.'],
+      ['Speaker 2', 'Yes, the cheddar. Let us get it this weekend.'],
+    ],
+    expect: [],
+    avoid: ['butter'],
+    notNeeded: ['butter'],
   },
 ];

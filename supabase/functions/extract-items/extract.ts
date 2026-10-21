@@ -19,7 +19,7 @@ Skip an item when:
 - it is not something sold at a grocery store (assignments, visits, errands);
 - it is only a passing mention with no sign it should be bought.
 
-Also return an item with action "not_needed" when a speaker says it no longer needs buying right now (for example "the eggs will last another week", "we're fine on milk", "never mind the bread"). You do not see the shopping list: report every such item, the app ignores ones that are not on it. A later utterance overrides an earlier one, so never return the same item as both "add" and "not_needed".
+Also return an item with action "not_needed" whenever a speaker says it does not need to be bought (now or soon), even if it is not mentioned anywhere else in the transcript. Typical phrasings: "the eggs will last another week", "we're fine on milk", "no need to buy the butter", "I found more butter in the fridge", "never mind the bread". The word "buy" does not have to appear. You do not see the shopping list: report every such item, the app ignores ones that are not on it. A later utterance overrides an earlier one, so never return the same item as both "add" and "not_needed".
 
 Rules:
 - "action" is "add" for items to buy and "not_needed" for items that no longer need buying.

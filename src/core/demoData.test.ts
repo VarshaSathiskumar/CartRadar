@@ -11,7 +11,10 @@ const NOW = new Date(2026, 9, 20, 14, 0, 0).getTime();
 /** Stands in for the model: reports each conversation's expected items on its second line. */
 function fakeModel(plan: ReturnType<typeof planDemo>[number]): Map<string, ExtractedItem[]> {
   const line = plan.utterances[1];
-  const items = plan.conversation.expect.map((name) => ({ name, canonical: canonicalName(name), sourceText: line.text }));
+  const items = [
+    ...plan.conversation.expect.map((name) => ({ name, canonical: canonicalName(name), sourceText: line.text })),
+    ...(plan.conversation.notNeeded ?? []).map((name) => ({ name, canonical: canonicalName(name), sourceText: line.text, notNeeded: true })),
+  ];
   return new Map([[line.id, items]]);
 }
 
@@ -54,7 +57,7 @@ describe('applyDemoConversation', () => {
     expect(state.items.filter((i) => i.status === 'queued').length).toBeGreaterThanOrEqual(3);
     expect(state.items.filter((i) => i.status === 'open').length).toBeGreaterThanOrEqual(10);
     expect(state.items.filter((i) => i.status === 'bought')).toHaveLength(1);
-    expect(state.history.every((i) => i.status === 'bought' && i.resolvedAt !== undefined)).toBe(true);
+    expect(state.history.every((i) => (i.status === 'bought' || i.status === 'notNeeded') && i.resolvedAt !== undefined)).toBe(true);
   });
 
   it('records the conversations it read in the heard list and never re-reads them', () => {
@@ -65,6 +68,15 @@ describe('applyDemoConversation', () => {
 
   it('does not add an item twice when it comes up again while still queued', () => {
     expect(demo.filter((i) => i.canonical === canonicalName('lemons'))).toHaveLength(1);
+  });
+
+  it('takes an item off the list when a later conversation says it is not needed, and keeps it in history', () => {
+    const butter = demo.filter((i) => i.canonical === canonicalName('butter'));
+    expect(butter).toHaveLength(1);
+    expect(butter[0]).toMatchObject({ status: 'notNeeded', notNeededText: expect.stringContaining('butter') });
+    expect(state.history).toContainEqual(butter[0]);
+    expect(state.items.some((i) => i.canonical === canonicalName('butter'))).toBe(false);
+    expect(state.items.some((i) => i.canonical === canonicalName('cheddar'))).toBe(true);
   });
 
   it('leaves the user\'s own items untouched', () => {

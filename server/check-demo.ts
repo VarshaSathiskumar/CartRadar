@@ -19,13 +19,18 @@ const results = await Promise.all(
 );
 
 for (const { c, items } of results) {
-  const names = items.map((i) => i.name.toLowerCase());
-  const missing = c.expect.filter((e) => !names.some((n) => n.includes(e)));
+  const names = items.filter((i) => i.action === 'add').map((i) => i.name.toLowerCase());
+  const dropped = items.filter((i) => i.action === 'not_needed').map((i) => i.name.toLowerCase());
+  const wantedDrops = c.notNeeded ?? [];
+  const missing = [
+    ...c.expect.filter((e) => !names.some((n) => n.includes(e))),
+    ...wantedDrops.filter((e) => !dropped.some((n) => n.includes(e))).map((e) => `${e} (not needed)`),
+  ];
   const unwanted = c.avoid.filter((a) => names.some((n) => n.includes(a)));
-  found += c.expect.length - missing.length;
+  found += c.expect.length + wantedDrops.length - missing.length;
   missed += missing.length;
   wrong += unwanted.length;
-  console.log(`${c.id}: ${items.map((i) => (i.quantity ? `${i.quantity} ${i.name}` : i.name)).join(', ')}`);
+  console.log(`${c.id}: ${items.map((i) => (i.action === 'not_needed' ? `${i.name} (not needed)` : i.quantity ? `${i.quantity} ${i.name}` : i.name)).join(', ')}`);
   if (missing.length) console.log(`  MISSING: ${missing.join(', ')}`);
   if (unwanted.length) console.log(`  SHOULD NOT BE THERE: ${unwanted.join(', ')}`);
 }
