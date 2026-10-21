@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../components/AuthProvider';
 import { useTheme } from '../components/theme';
@@ -40,6 +40,15 @@ export default function LoginScreen() {
         {busy && <Muted style={{ textAlign: 'center' }}>Signing in...</Muted>}
         {error && <Text style={[styles.error, { color: t.danger }]}>{error}</Text>}
       </View>
+      {Platform.OS === 'web' && (
+        <View style={[styles.note, { backgroundColor: t.card, borderColor: t.border }]}>
+          <Text style={{ fontSize: 20 }}>📱</Text>
+          <Text style={{ flex: 1, color: t.muted, fontSize: 13, lineHeight: 18 }}>
+            <Text style={{ color: t.text, fontWeight: '700' }}>Best on mobile. </Text>
+            Use CartRadar on your phone for the complete experience, including store reminders that work when the app is closed.
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -49,5 +58,6 @@ const styles = StyleSheet.create({
   body: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 10 },
   logo: { fontSize: 44, textAlign: 'center' },
   title: { fontSize: 30, fontWeight: '800', textAlign: 'center' },
+  note: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, padding: 14, marginHorizontal: 24, marginBottom: 20 },
   error: { textAlign: 'center', fontWeight: '600', marginTop: 6 },
 });
