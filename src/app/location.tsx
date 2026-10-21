@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../components/theme';
-import { Button, Card, Chip, Muted, SectionTitle, Toggle } from '../components/ui';
-import { distanceMeters, formatMiles, googleMapsDirectionsUrl } from '../core/geo';
+import { Button, Card, Muted, SectionTitle, Toggle } from '../components/ui';
+import { MAX_REMINDER_MILES, MIN_REMINDER_MILES, distanceMeters, formatMiles, googleMapsDirectionsUrl, milesText, parseReminderMiles } from '../core/geo';
 import { setStores, toggleStore, updateSettings } from '../core/listLogic';
 import type { Store } from '../core/types';
 import { syncGeofences, type GeofenceStatus } from '../services/geofence';
@@ -13,8 +13,6 @@ import { useUserLocation } from '../services/location';
 import { requestNotificationPermission } from '../services/notifications';
 import { mutate, useAppState } from '../services/store';
 import { findGroceryStores, geocodeZip } from '../services/stores';
-
-const RADII = [150, 250, 500];
 
 const statusMessage: Record<GeofenceStatus, string> = {
   active: 'Watching for stores',
@@ -37,6 +35,10 @@ export default function LocationScreen() {
     .sort((a, b) => (a.meters ?? 0) - (b.meters ?? 0));
 
   const [zip, setZip] = useState(settings.zip);
+  const [miles, setMiles] = useState(milesText(settings.geofenceRadiusM));
+  const reminderMeters = parseReminderMiles(miles);
+  // Compared as shown (the box rounds to two decimals), so the stored 250 m reads as already saved at 0.16.
+  const unchanged = Number(miles) === Number(milesText(settings.geofenceRadiusM));
   const [busy, setBusy] = useState<'zip' | 'gps' | undefined>();
   const [geoStatus, setGeoStatus] = useState<GeofenceStatus | undefined>();
   // Shown inline: Alert.alert does nothing in the browser, where errors would otherwise be invisible.
@@ -148,11 +150,28 @@ export default function LocationScreen() {
           <>
             <SectionTitle>Remind me within</SectionTitle>
             <Card>
-              <View style={styles.rowGap}>
-                {RADII.map((r) => (
-                  <Chip key={r} label={`${r} m`} selected={settings.geofenceRadiusM === r} onPress={() => void patch({ geofenceRadiusM: r }).then(refreshGeofences)} />
-                ))}
+              <View style={styles.milesRow}>
+                <TextInput
+                  value={miles}
+                  onChangeText={setMiles}
+                  keyboardType="decimal-pad"
+                  accessibilityLabel="Reminder distance in miles"
+                  style={[styles.input, styles.milesInput, { color: t.text, borderColor: t.border }]}
+                />
+                <Text style={{ color: t.text, fontSize: 16 }}>miles of a store</Text>
+                <Button
+                  label="Save"
+                  onPress={() => reminderMeters !== undefined && void patch({ geofenceRadiusM: reminderMeters }).then(refreshGeofences)}
+                  disabled={reminderMeters === undefined || unchanged}
+                />
               </View>
+              <Muted>
+                {reminderMeters === undefined
+                  ? `Enter a distance from ${MIN_REMINDER_MILES} to ${MAX_REMINDER_MILES} miles.`
+                  : unchanged
+                    ? 'You get a reminder when you come this close to a store you turned on.'
+                    : 'Tap Save to use this distance.'}
+              </Muted>
             </Card>
           </>
         )}
@@ -167,6 +186,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800' },
   input: { borderWidth: 1, borderRadius: 10, padding: 10, fontSize: 16, marginBottom: 10 },
   rowGap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  milesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  milesInput: { width: 72, marginBottom: 0, textAlign: 'center' },
   originNote: { marginHorizontal: 20, marginBottom: 8 },
   storeFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
 });

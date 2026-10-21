@@ -25,23 +25,6 @@ function toUser(u: SupabaseUser): User {
   return { id: u.id, name: meta?.name ?? meta?.full_name ?? null, email: u.email ?? '' };
 }
 
-/** Emails a 6-digit code (the Supabase "Magic Link" email template must include {{ .Token }}). Creates the account on first use. */
-export async function requestEmailCode(email: string): Promise<void> {
-  const { error } = await client().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
-  if (error) throw new Error(error.message);
-}
-
-export async function verifyEmailCode(details: { email: string; code: string; name?: string }): Promise<User> {
-  const auth = client().auth;
-  const { data, error } = await auth.verifyOtp({ email: details.email.trim(), token: details.code, type: 'email' });
-  if (error || !data.user) throw new Error(error?.message ?? 'Incorrect code');
-  if (details.name && !toUser(data.user).name) {
-    const updated = await auth.updateUser({ data: { name: details.name } });
-    if (updated.data.user) return toUser(updated.data.user);
-  }
-  return toUser(data.user);
-}
-
 /** Trades the ID token from Google's button for a Supabase session; Supabase checks it with Google. */
 export async function signInWithGoogle(idToken: string): Promise<User> {
   const { data, error } = await client().auth.signInWithIdToken({ provider: 'google', token: idToken });

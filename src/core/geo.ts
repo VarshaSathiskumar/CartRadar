@@ -9,6 +9,20 @@ export function distanceMeters(a: { latitude: number; longitude: number }, b: { 
 
 export const metersToMiles = (m: number): number => m / 1609.344;
 
+/** Closest and farthest a reminder distance can be: tighter than this and GPS drift misses the store, wider and it fires from across town. */
+export const MIN_REMINDER_MILES = 0.1;
+export const MAX_REMINDER_MILES = 5;
+
+/** The distance a user typed, in miles, as whole metres; undefined when it is not a number in range. */
+export function parseReminderMiles(text: string): number | undefined {
+  const miles = Number(text.trim());
+  if (!text.trim() || !Number.isFinite(miles) || miles < MIN_REMINDER_MILES || miles > MAX_REMINDER_MILES) return undefined;
+  return Math.round(miles * 1609.344);
+}
+
+/** Miles for an input box: at most two decimals, no trailing zeros. */
+export const milesText = (meters: number): string => String(Number(metersToMiles(meters).toFixed(2)));
+
 /** "0.4 mi" under ten miles, whole miles beyond. */
 export function formatMiles(meters: number): string {
   const mi = metersToMiles(meters);
