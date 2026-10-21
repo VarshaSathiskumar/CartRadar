@@ -18,8 +18,8 @@ const MAX_LIMIT = 20;
 class BeeError extends Error {}
 
 async function bee<T>(path: string): Promise<T> {
-  const token = Deno.env.get('BEE_TOKEN');
-  if (!token) throw new BeeError('BEE_TOKEN is not set on the server');
+  const token = Deno.env.get('BEE_TOKEN') || Deno.env.get('BEE_API_TOKEN');
+  if (!token) throw new BeeError('BEE_TOKEN (or BEE_API_TOKEN) is not set on the server');
   const res = await fetch(`${BEE_URL}${path}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     signal: AbortSignal.timeout(20_000),
