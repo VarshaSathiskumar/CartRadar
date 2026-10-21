@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { handleEnter, handleExit, leftoverPromptText, reminderText, tripText } from '../core/listLogic';
+import { claimNearbyStores } from '../core/proximity';
 import { LEFTOVERS_CATEGORY, notifyNow } from './notifications';
 import { mutate, readState } from './store';
 
@@ -25,12 +26,15 @@ TaskManager?.defineTask<{ eventType: Location.GeofencingEventType; region: Locat
     const now = Date.now();
 
     if (data.eventType === Location.GeofencingEventType.Enter) {
+      const here = await currentPosition();
       const decision = await mutate((s) => {
         const d = handleEnter(s, storeId, now);
-        return { state: d.state, result: d };
+        // Other stores around the same spot share this one notification.
+        const nearby = d.reminder && here ? claimNearbyStores(d.state, storeId, here, now) : undefined;
+        return { state: nearby?.state ?? d.state, result: { ...d, others: nearby?.others.length ?? 0 } };
       });
       if (decision?.reminder) {
-        const { title, body } = reminderText(decision.reminder.store);
+        const { title, body } = reminderText(decision.reminder.store, decision.others);
         await notifyNow(title, body, { screen: 'list' });
       }
     } else if (data.eventType === Location.GeofencingEventType.Exit) {
@@ -50,6 +54,15 @@ TaskManager?.defineTask<{ eventType: Location.GeofencingEventType; region: Locat
     }
   },
 );
+
+async function currentPosition(): Promise<{ latitude: number; longitude: number } | undefined> {
+  try {
+    const pos = (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({}));
+    return pos.coords;
+  } catch {
+    return undefined; // no fix: this store's reminder still goes out on its own
+  }
+}
 
 export type GeofenceStatus = 'active' | 'no-stores' | 'foreground-denied' | 'background-denied' | 'unavailable';
 

@@ -46,3 +46,26 @@ export function checkProximity(
 
   return { inside: nextInside, state: lastNotifiedAt === state.lastNotifiedAt ? state : { ...state, lastNotifiedAt }, reminders };
 }
+
+/**
+ * For a phone geofence enter: the other enabled stores that the position is also inside (within the geofence radius)
+ * and that are due a reminder. They are marked as reminded, so the one notification covers them and their own enter
+ * events stay silent.
+ */
+export function claimNearbyStores(
+  state: PersistedState,
+  storeId: string,
+  here: { latitude: number; longitude: number },
+  now: number,
+): { state: PersistedState; others: Store[] } {
+  const others = state.stores.filter((st) => {
+    if (st.id === storeId || !st.enabled) return false;
+    const last = state.lastNotifiedAt[st.id];
+    if (last !== undefined && now - last < NOTIFY_COOLDOWN_MS) return false;
+    return distanceMeters(here, st) <= state.settings.geofenceRadiusM;
+  });
+  if (others.length === 0) return { state, others };
+  const lastNotifiedAt = { ...state.lastNotifiedAt };
+  for (const st of others) lastNotifiedAt[st.id] = now;
+  return { state: { ...state, lastNotifiedAt }, others };
+}

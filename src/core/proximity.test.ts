@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NOTIFY_COOLDOWN_MS } from './listLogic';
-import { checkProximity, WEB_REMINDER_RADIUS_M as R } from './proximity';
+import { checkProximity, claimNearbyStores, WEB_REMINDER_RADIUS_M as R } from './proximity';
 import { EMPTY_STATE } from './types';
 import type { ListItem, PersistedState, Store } from './types';
 
@@ -41,5 +41,22 @@ describe('checkProximity', () => {
   it('skips disabled stores and empty lists', () => {
     expect(checkProximity({ ...base, stores: [{ ...store, enabled: false }] }, at(10), new Set(), 1).reminders).toHaveLength(0);
     expect(checkProximity({ ...base, items: [] }, at(10), new Set(), 1).reminders).toHaveLength(0);
+  });
+});
+
+describe('claimNearbyStores', () => {
+  const other: Store = { id: 's2', name: 'Target', latitude: 40.001, longitude: -74, enabled: true } as Store;
+  const far: Store = { id: 's3', name: 'Far', latitude: 41, longitude: -74, enabled: true } as Store;
+  const state: PersistedState = { ...base, stores: [store, other, far], settings: { ...base.settings, geofenceRadiusM: 500 } };
+
+  it('claims stores within the radius and marks them reminded', () => {
+    const r = claimNearbyStores(state, 's1', { latitude: 40, longitude: -74 }, 10);
+    expect(r.others.map((o) => o.id)).toEqual(['s2']);
+    expect(r.state.lastNotifiedAt.s2).toBe(10);
+  });
+
+  it('skips stores still cooling down', () => {
+    const cooling = { ...state, lastNotifiedAt: { s2: 5 } };
+    expect(claimNearbyStores(cooling, 's1', { latitude: 40, longitude: -74 }, 10).others).toHaveLength(0);
   });
 });
