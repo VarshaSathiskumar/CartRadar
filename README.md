@@ -1,91 +1,485 @@
-# CartRadar
+# CartRadar 🛒
 
-A grocery assistant for the Bee wearable. It reads the conversations Bee captures, picks out what you said you need ("we're out of eggs", "we need noodles"), builds a shopping list, and reminds you when you're near a grocery store.
+### Your conversations, your shopping list.
 
-Built with Expo (React Native + TypeScript), so it runs on iOS and Android.
+CartRadar is an AI-powered grocery shopping assistant built for the **Amazon Bee wearable** or **Bee’s Apple Watch app**.
 
-## How it works
+It transforms everyday conversations into actionable grocery lists. When you mention something you need to buy, CartRadar retrieves the conversation from Bee, extracts grocery items using OpenAI, and adds them to your shopping list. It also notifies you about pending purchases when you arrive near a grocery store.
 
-1. **Listen.** When you open the app, pull down on the list, or press **Sync now** in Settings, the app calls the `bee-sync` Supabase Edge Function, which reads your recent Bee conversations with a token kept in Supabase secrets.
-2. **Extract.** The app sends lines it has not read yet to the `extract-items` Edge Function, which asks OpenAI which items the speakers mean to buy (same prompt and schema as the earlier local server). Items are merged into your list and saved to Supabase by the existing cloud sync. If the signed-out app has no cloud account, the rule-based extractor in `src/core/extractor.ts` is the fallback; it finds grocery needs: "out of X", "ran out of X", "we need to buy X", "add X to the list", "the milk is gone", and so on. It handles lists ("eggs, milk and bread"), quantities ("two dozen eggs"), and negations ("we don't need rice"), and only accepts phrases containing a grocery word, so "we're out of time" is ignored.
-3. **List.** Items are de-duplicated ("egg" and "eggs" are the same) and shown with the phrase that triggered them. A recently checked-off item isn't re-added for 12 hours.
-4. **Remind.** Enter the zip code you shop in; CartRadar finds nearby grocery stores (OpenStreetMap) and sets up geofences. Arriving at one sends a notification with what's on your list (at most once every 2 hours per store).
-5. **Leftovers.** Leaving a store after at least 3 minutes ends the trip. Checked-off items go to history. Everything else is handled by the Settings toggle **Send leftovers to my cart**:
-   - **Off:** leftovers stay on the list for the next trip, marked "Carried over".
-   - **On:** leftovers move to the **Cart queue** tab, where each item opens a prefilled search in your shopping app (Amazon Fresh, Instacart or Walmart).
+## The Problem
 
-   Nothing is ever deleted automatically. A **Finish trip** button does the same thing manually.
+We often mention things we need while talking to friends or family:
 
-## Privacy
+- "We're out of eggs."
+- "I need to pick up milk tomorrow."
+- "Don't forget to buy noodles."
 
-- Transcript lines pass through your Supabase Edge Functions and are sent to OpenAI for extraction. They are not stored on the server. Only phrases that added an item are kept on the device (last 50, visible on the **Heard** tab); every other utterance is discarded after processing.
-- The Bee token and OpenAI key live only in Supabase secrets. Both functions check the caller's Supabase session and only accept emails listed in `ALLOWED_EMAILS`.
-- Recording other people has legal consent requirements in many places. That's between you and your Bee device, but worth knowing.
+But those conversations rarely make it into our shopping lists.
 
-## Run it
+CartRadar bridges that gap by turning conversational information into actionable reminders.
+
+## Features
+
+**Bee-Powered Grocery Extraction**
+
+Retrieves recent conversations captured by Bee and identifies grocery items mentioned naturally.
+
+### 🧠 AI-Powered Understanding
+Uses OpenAI to extract grocery items, understand quantities, and identify purchase intent.
+
+### 🛒 Smart Shopping Lists
+Automatically deduplicates items, tracks purchased products, and preserves the conversation phrases that generated them.
+
+### 📍 Location-Based Reminders
+Uses nearby grocery store locations from OpenStreetMap to configure geofences on supported native devices.
+
+### 📦 Leftover Management
+After a shopping trip, unfinished items can remain on the grocery list or move to a separate Cart queue.
+
+### 🛍️ Retailer Hand-Off
+Opens prefilled product searches in Amazon Fresh. CartRadar does not automatically add products to retailer carts.
+
+### ☁️ Cloud Synchronization
+Uses Supabase to persist shopping lists across sessions.
+
+### 🎬 Demo Mode
+Includes scripted conversations for demonstrating the application without a Bee device.
+
+## How It Works
+
+### 1. Capture Conversations
+
+Bee captures everyday conversations through its wearable device.
+
+CartRadar automatically polls for new Bee conversations every 5 minutes through the bee-sync Supabase Edge Function. Users can also trigger synchronization by opening the app, refreshing the shopping list, or selecting Sync now in Settings.
+
+The function connects to Bee's developer API using a token stored in Supabase secrets.
+
+### 2. Extract Grocery Items
+
+New conversation utterances are passed to the `extract-items` Edge Function.
+
+OpenAI identifies grocery items and purchase intent.
+
+For example:
+
+**Conversation:**
+
+"We're out of eggs, and I need to buy milk and bananas."
+
+**Extracted items:**
+
+- Eggs
+- Milk
+- Bananas
+
+CartRadar also includes a rule-based extraction fallback for signed-out local use.
+
+The fallback recognizes expressions such as "we need to buy," "ran out of," and "add to the list." It also handles quantities, lists, and common negations.
+
+### 3. Build the Shopping List
+
+Extracted items are merged into the existing list.
+
+CartRadar:
+
+- Deduplicates equivalent item names.
+- Preserves the triggering conversation phrase.
+- Prevents recently purchased items from being re-added for 12 hours.
+- Saves the updated list using Supabase cloud synchronization.
+
+### 4. Detect Nearby Grocery Stores
+
+Users can enter a ZIP code or use their current location to find nearby grocery stores.
+
+CartRadar retrieves nearby grocery stores using OpenStreetMap and configures geofences through the native location APIs.
+
+When a user enters a monitored grocery store region, the application can trigger a notification containing pending shopping items.
+
+**Platform requirement:** Background geofencing requires a compatible native development or production build with the necessary location permissions. It is not supported by the Vercel web deployment.
+
+### 5. Manage Unfinished Purchases
+
+When the user leaves a store after at least three minutes, CartRadar can finish the shopping trip.
+
+Purchased items move to history.
+
+Unfinished items follow the user's selected preference:
+
+**Keep on List**
+
+Items remain on the grocery list and are marked as carried over.
+
+**Send to Cart Queue**
+
+Items move to the Cart queue, where users can open product searches in Amazon Fresh.
+
+Users can also manually complete a shopping trip using **Finish trip**.
+
+No items are automatically deleted.
+
+## Technical Architecture
+
+```text
+                Bee Wearable
+                     |
+                     v
+             Bee Conversations
+                     |
+                     v
+              Bee Developer API
+                     |
+                     v
+         Supabase Edge Function
+                  bee-sync
+                     |
+                     v
+            New Conversation Lines
+                     |
+                     v
+         Supabase Edge Function
+                extract-items
+                     |
+                     v
+                 OpenAI API
+                     |
+                     v
+             Grocery Item Parser
+                     |
+                     v
+           Deduplication and Merge
+                     |
+                     v
+             Shopping List
+                     |
+                     v
+              Supabase Storage
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+    Native Geofencing       Cart Queue
+          |                     |
+          v                     v
+    Store Reminders       Retailer Search
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Mobile application | React Native, Expo |
+| Programming language | TypeScript |
+| Navigation | Expo Router |
+| Conversation source | Amazon Bee Developer API |
+| AI extraction | OpenAI API |
+| Backend | Supabase Edge Functions |
+| Database | Supabase |
+| Authentication | Google OAuth |
+| Location services | Native geofencing |
+| Store discovery | OpenStreetMap |
+| Web deployment | Vercel |
+| Testing | Unit tests and TypeScript type checking |
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js and npm
+- Expo development environment
+- Supabase project
+- OpenAI API key
+- Bee developer access and a valid Bee token
+- Google OAuth credentials
+- Android or iOS development environment for native features
+
+### 1. Clone the Repository
+
+```bash
+git clone <YOUR_REPOSITORY_URL>
+cd CartRadar
+```
+
+### 2. Install Dependencies
 
 ```bash
 npm install
-npm test            # extractor + list/geofence logic
-npm run typecheck
-npx expo run:android   # or: npx expo run:ios (macOS)
 ```
 
-This needs a **development build**, not Expo Go: background location, geofencing, and background tasks aren't available in Expo Go. Alternatively use `npx eas-cli build --profile development`.
+### 3. Configure Environment Variables
 
-To try everything without a Bee device, open **Settings → Demo mode**. Pull down on the list to feed in the next lines of a scripted conversation.
+Configure the following public application variables:
 
-## Deploy (Vercel + Supabase)
+```env
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=
+```
 
-Needs the [Supabase CLI](https://supabase.com/docs/guides/cli) (`npx supabase` works) and a Supabase project with `supabase/migrations/0001_init.sql` applied and Google sign-in enabled.
+These are client-side configuration values.
+
+Never place Bee authentication tokens, OpenAI API keys, or Supabase service-role credentials in variables prefixed with `EXPO_PUBLIC_`.
+
+### 4. Configure Supabase
+
+Log in and link your Supabase project:
 
 ```bash
 npx supabase login
-npx supabase link --project-ref <ref>
+npx supabase link --project-ref <PROJECT_REF>
+```
 
-# Secrets: copy supabase/functions/.env.example to supabase/functions/.env, fill it in, then
+Apply the database schema in:
+
+```text
+supabase/migrations/0001_init.sql
+```
+
+Configure Google authentication in Supabase.
+
+### 5. Configure Server Secrets
+
+Copy the example environment file:
+
+```text
+supabase/functions/.env.example
+```
+
+Create:
+
+```text
+supabase/functions/.env
+```
+
+Fill in the required server-side credentials, including the Bee token, OpenAI key, and allowed-user configuration.
+
+Upload the secrets:
+
+```bash
 npx supabase secrets set --env-file supabase/functions/.env
+```
 
+Never commit this file.
+
+### 6. Deploy Edge Functions
+
+```bash
 npx supabase functions deploy bee-sync --no-verify-jwt
+
 npx supabase functions deploy extract-items --no-verify-jwt
 ```
 
-`--no-verify-jwt` turns off only the gateway check; the functions verify the session themselves (`supabase/functions/_shared/auth.ts`), which also works with Supabase's newer asymmetric JWT keys.
+The functions implement application-level session verification in:
 
-Then on Vercel (`vercel.json` sets the Expo web build, the `dist` output folder and the single page rewrite), import the repo and set these environment variables for Production and Preview. They are baked in at build time, so redeploy after changing them:
-
-```
-EXPO_PUBLIC_SUPABASE_URL
-EXPO_PUBLIC_SUPABASE_ANON_KEY
-EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+```text
+supabase/functions/_shared/auth.ts
 ```
 
-Add the Vercel URL to the Google OAuth client's authorized JavaScript origins and to Supabase's Authentication, URL Configuration, Site URL.
+Disabling gateway JWT verification does not mean the endpoints should be publicly accessible without authentication.
 
-Check the server side without the app (both should print JSON, not an auth error):
+### 7. Run the Application
+
+Install dependencies and run the project checks:
 
 ```bash
-curl -H "Authorization: Bearer $BEE_TOKEN" https://api.developer.bee.amazon.dev/v1/me
-npx supabase functions logs bee-sync    # or read the logs in the Supabase dashboard
+npm install
+npm test
+npm run typecheck
 ```
 
-**Test on iPhone:** open the Vercel URL in Safari, sign in with Google, and open Settings. Press **Sync now**: the status line shows `Syncing...` then what was added, or the error. Say something groceries-related near your Bee, wait for it to appear in Bee's app, then pull down on the list. Optional: Share, Add to Home Screen.
+For Android:
 
-## Things you should know
-
-- **Bee API facts and gaps** (checked against docs.bee.computer/docs/api and a live account). Base URL is `https://api.developer.bee.amazon.dev` with `Authorization: Bearer <token>`; the earlier `api.bee.computer` host in this repo does not exist. Used: `GET /v1/conversations` (newest first, has `next_cursor`, summaries only) and `GET /v1/conversations/:id` (has `transcriptions[].utterances[]` with `id`, `text`, `speaker`, `spoken_at`). The docs list these endpoints but **not their response fields**, so the field names in `supabase/functions/bee-sync/bee.ts` come from a live response and could change without notice. There is no dedicated transcript endpoint in the API docs (the CLI has `bee conversations transcript`, but it is not documented as an API route).
-- **Getting `BEE_TOKEN` is not documented.** The docs say to send a Bearer token but never say how to obtain one outside the CLI. Developer Mode in the Bee iOS app (tap Version 5 times) is required for the CLI. `bee login --token` shows the CLI accepts a token, and `bee status` shows a truncated JWT, but no documented command prints the full token, and its lifetime is unknown. If it expires, `bee-sync` returns "Bee rejected the server token" and the app shows that in the sync status; set `BEE_TOKEN` again. A token that expires quickly makes this design unreliable, and the fix would be a refresh flow from Bee, which the docs do not describe.
-- **Duplicate protection.** Each line has a stable id (`<conversation>:<utterance>`); lines already read are skipped, concurrent syncs share one run, and the list ignores items it already has (or bought in the last 12 hours). The list of read lines is kept per device, so a second device that has never synced may re-read recent conversations; the list-level check still prevents repeats of unbought items.
-- **"Add to cart" is a hand-off, not a silent add.** Amazon, Instacart and Walmart don't expose a public API to add items to a user's cart. The Cart queue opens each item's search in the retailer's app. A real integration would need a retailer partner API (for example Instacart's developer platform) and a small backend.
-- **Background timing is up to the OS.** Geofence reminders are reliable once "Always" location is granted. Background Bee syncing runs at the OS's discretion (roughly every 15+ minutes at best), so a very recent remark may not be on your list until you open the app or sync.
-- **Geofence limits.** iOS allows 20 monitored regions per app; CartRadar uses the 15 nearest stores. Store data comes from OpenStreetMap and may be incomplete in some areas.
-
-## Layout
-
+```bash
+npx expo run:android
 ```
-src/core/       pure logic, unit-tested (extractor, list/trip rules, geofence handlers)
-src/bee/        sync pipeline, sync status, calls to the Edge Functions
-src/services/   storage, geofencing, notifications, store search, cart hand-off, Edge Function caller
-supabase/       database migration and the bee-sync and extract-items Edge Functions
-src/app/        screens (Expo Router): List, Cart queue, Heard, Settings
+
+For iOS:
+
+```bash
+npx expo run:ios
+```   
+
+Alternatively, use an Expo development build:
+
+```bash
+npx eas-cli build --profile development
 ```
+
+**Important:** Background location monitoring, geofencing, and background tasks require a compatible native build. Expo Go and the browser-based deployment do not provide the complete native feature set.
+
+## Web Deployment
+
+CartRadar also supports web deployment through Vercel.
+
+The repository includes `vercel.json`, which configures the Expo web build, output directory, and single-page application routing.
+
+### Deploy to Vercel
+
+1. Import the GitHub repository into Vercel.
+2. Configure the required public environment variables.
+3. Deploy the application.
+4. Add the deployed URL to the Google OAuth authorized JavaScript origins.
+5. Configure the corresponding Supabase Authentication URL settings.
+6. Redeploy if build-time environment variables change.
+
+The web deployment supports the application features compatible with browser APIs.
+
+Native background geofencing is not available in the web version.
+
+## Testing Bee Integration
+
+CartRadar connects to the Bee Developer API:
+
+```text
+https://api.developer.bee.amazon.dev
+```
+
+The integration uses:
+
+```http
+GET /v1/conversations
+GET /v1/conversations/:id
+```
+
+The first endpoint retrieves recent conversations.
+
+The second retrieves individual conversation details, including transcription data where available.
+
+### Test the Connection
+
+With a valid Bee token configured locally:
+
+```bash
+curl \
+  -H "Authorization: Bearer $BEE_TOKEN" \
+  https://api.developer.bee.amazon.dev/v1/me
+```
+
+To test the application:
+
+1. Sign in to CartRadar.
+2. Open Settings.
+3. Select **Sync now**.
+4. Verify the synchronization status.
+5. Mention a grocery item in a conversation captured by Bee.
+6. Wait for the conversation to become available through Bee.
+7. Sync CartRadar again.
+8. Verify that the grocery item appears in the shopping list.
+
+This demonstrates the live Bee integration rather than the scripted demo.
+
+## Demo Mode
+
+CartRadar includes a demo mode for testing without a Bee device.
+
+To use it:
+
+1. Open Settings.
+2. Enable **Demo mode**.
+3. Return to the grocery list.
+4. Pull down to refresh.
+5. Review the grocery items extracted from the scripted conversation.
+
+Demo mode is separate from the live Bee integration.
+
+For the Bee hackathon track, the demonstration video should show the actual Bee integration processing live Bee conversation data.
+
+## Privacy and Security
+
+CartRadar is designed to minimize the amount of conversational information retained.
+
+- Bee tokens and OpenAI credentials are stored in Supabase secrets.
+- Edge Functions validate Supabase sessions and restrict access using `ALLOWED_EMAILS`.
+- Conversation utterances are processed for grocery extraction rather than stored as complete server-side transcripts.
+- The application retains up to 50 triggering phrases locally in the Heard tab.
+- Utterances that do not produce grocery items are discarded after processing.
+- Users control their shopping lists and purchased-item history.
+
+Conversation text is sent to OpenAI for extraction.
+
+Users are responsible for obtaining any consent required when recording conversations involving other people.
+
+## Known Limitations
+
+### Bee Authentication
+
+The Bee Developer API requires a Bearer token.
+
+The currently documented API does not provide a clearly described token acquisition and refresh workflow for this integration.
+
+If the token expires, CartRadar requires an updated server-side token.
+
+### Bee API Response Format
+
+The integration uses conversation response fields observed from a live Bee account.
+
+Some response fields are not fully documented and may change.
+
+### Native Geofencing
+
+Background geofencing requires native location permissions and compatible operating-system support.
+
+iOS limits the number of monitored regions. CartRadar monitors up to 15 nearby stores.
+
+Actual delivery timing is controlled by the operating system and is not guaranteed.
+
+### Retailer Integration
+
+The Cart queue opens product searches in external shopping services.
+
+It does not automatically insert items into a user's retailer cart.
+
+### Cross-Device Deduplication
+
+Processed conversation identifiers are tracked per device.
+
+A new device may reprocess older conversations, although shopping-list deduplication prevents many duplicate entries.
+
+## Project Structure
+
+```text
+CartRadar/
+├── src/
+│   ├── app/
+│   │   └── Application screens
+│   ├── bee/
+│   │   └── Bee synchronization pipeline
+│   ├── core/
+│   │   └── Extraction and shopping logic
+│   └── services/
+│       └── Storage, location, notifications
+│
+├── supabase/
+│   ├── migrations/
+│   │   └── 0001_init.sql
+│   └── functions/
+│       ├── bee-sync/
+│       ├── extract-items/
+│       └── _shared/
+│
+├── package.json
+├── vercel.json
+├── README.md
+└── LICENSE
+```
+
+## Future Improvements
+
+- Support a documented Bee authentication refresh flow.
+- Improve cross-device synchronization of processed conversations.
+- Expand native notification reliability and testing.
+- Add smarter grocery categorization.
+- Explore direct retailer-cart integrations through supported partner APIs.
+
+## Hackathon Submission
+
+**Track:** Bee
+
+**Demo Video:** [Add YouTube link]
+
+**Live Web Demo:** https://cartradar-five.vercel.app/
+
+
+## License
+
+This project is released under the MIT License. See the `LICENSE` file for details.
