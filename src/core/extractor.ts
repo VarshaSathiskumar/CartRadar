@@ -6,6 +6,8 @@ export interface ExtractedItem {
   quantity?: string;
   /** The clause of the conversation that produced this item. */
   sourceText: string;
+  /** True when the speakers said this no longer needs buying; such items are never added to the list. */
+  notNeeded?: boolean;
 }
 
 /** Compound names that contain "and" and must not be split into two items. */

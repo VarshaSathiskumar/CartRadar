@@ -5,6 +5,7 @@ import {
   NOTIFY_COOLDOWN_MS,
   REBUY_SUPPRESS_MS,
   clearQueued,
+  dismissNotNeeded,
   finishTrip,
   groupHistoryByDay,
   handleEnter,
@@ -233,5 +234,26 @@ describe('recordHeard', () => {
     expect(twice.heard).toHaveLength(1);
     expect(twice.heard[0].found).toEqual(['milk', 'eggs']);
     expect(twice.seenUtteranceIds).toEqual(['u1']);
+  });
+});
+
+describe('dismissNotNeeded', () => {
+  const eggs = (sourceText: string) => [{ name: 'eggs', canonical: 'egg', sourceText, notNeeded: true }];
+
+  it('moves an open item to history with the phrase that removed it', () => {
+    const state = add(withStore(), 'we need eggs and milk');
+    const { state: next, removed } = dismissNotNeeded(state, eggs('the eggs will last another week'), NOW + 1000);
+    expect(removed.map((i) => i.name)).toEqual(['eggs']);
+    expect(openItems(next.items).map((i) => i.name)).toEqual(['milk']);
+    expect(next.history[0]).toMatchObject({ name: 'eggs', status: 'notNeeded', notNeededText: 'the eggs will last another week', resolvedAt: NOW + 1000 });
+  });
+
+  it('ignores items that are not open on the list', () => {
+    const state = withStore();
+    expect(dismissNotNeeded(state, eggs('x'), NOW).state).toBe(state);
+  });
+
+  it('is never added by mergeExtracted', () => {
+    expect(mergeExtracted(withStore(), eggs('x'), 'bee', NOW, newId).added).toEqual([]);
   });
 });

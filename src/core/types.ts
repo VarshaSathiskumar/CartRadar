@@ -1,4 +1,4 @@
-export type ItemStatus = 'open' | 'bought' | 'queued';
+export type ItemStatus = 'open' | 'bought' | 'queued' | 'notNeeded';
 export type ItemSource = 'bee' | 'manual';
 
 export interface ListItem {
@@ -12,6 +12,8 @@ export interface ListItem {
   addedAt: number;
   /** The phrase that triggered the item, shown so the user can see why it was added. */
   heardText?: string;
+  /** For a 'notNeeded' item: the phrase that took it off the list. */
+  notNeededText?: string;
   /** How many trips this item has survived without being bought. */
   carriedOver: number;
   resolvedAt?: number;

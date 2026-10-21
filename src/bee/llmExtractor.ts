@@ -11,6 +11,7 @@ interface ServerItem {
   name: string;
   quantity: string;
   utterance_index: number;
+  action?: 'add' | 'not_needed';
 }
 
 /**
@@ -37,6 +38,7 @@ export async function extractWithLlm(utterances: Utterance[]): Promise<Map<strin
         canonical: canonicalName(item.name),
         quantity: item.quantity || undefined,
         sourceText: source.text,
+        ...(item.action === 'not_needed' ? { notNeeded: true } : {}),
       });
       byUtterance.set(source.id, list);
     }

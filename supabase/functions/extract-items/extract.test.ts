@@ -32,6 +32,12 @@ describe('extract', () => {
     expect(out.map((i) => i.name)).toEqual(['eggs', 'rice']);
   });
 
+  it('keeps add and not_needed apart and defaults a missing action to add', async () => {
+    const client = fake(reply([item('eggs', 0), { ...item('eggs', 1), action: 'not_needed' }]));
+    const out = await extract(client, 'm', [{ text: 'a' }, { text: 'b' }]);
+    expect(out.map((i) => `${i.action}:${i.name}`)).toEqual(['add:eggs', 'not_needed:eggs']);
+  });
+
   it('throws on a refusal or an empty reply', async () => {
     await expect(extract(fake({ refusal: 'no' }), 'm', [{ text: 'a' }])).rejects.toThrow('refused');
     await expect(extract(fake({ content: null }), 'm', [{ text: 'a' }])).rejects.toThrow('no content');

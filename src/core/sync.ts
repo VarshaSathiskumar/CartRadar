@@ -106,6 +106,7 @@ export interface ItemRow {
   status: ListItem['status'];
   source: ListItem['source'];
   heard_text: string | null;
+  not_needed_text: string | null;
   carried_over: number;
   archived: boolean;
   added_at: string;
@@ -124,6 +125,7 @@ export function toItemRow(userId: string, { item, archived }: RemoteItem): ItemR
     status: item.status,
     source: item.source,
     heard_text: item.heardText ?? null,
+    not_needed_text: item.notNeededText ?? null,
     carried_over: item.carriedOver,
     archived,
     added_at: iso(item.addedAt),
@@ -146,6 +148,7 @@ export function fromItemRow(row: ItemRow): RemoteItem {
   };
   if (row.quantity !== null) item.quantity = row.quantity;
   if (row.heard_text !== null) item.heardText = row.heard_text;
+  if (row.not_needed_text !== null) item.notNeededText = row.not_needed_text;
   if (row.resolved_at !== null) item.resolvedAt = Date.parse(row.resolved_at);
   return { item, archived: row.archived, deletedAt: row.deleted_at === null ? undefined : Date.parse(row.deleted_at) };
 }

@@ -19,7 +19,10 @@ Skip an item when:
 - it is not something sold at a grocery store (assignments, visits, errands);
 - it is only a passing mention with no sign it should be bought.
 
+Also return an item with action "not_needed" when a speaker says it no longer needs buying right now (for example "the eggs will last another week", "we're fine on milk", "never mind the bread"). You do not see the shopping list: report every such item, the app ignores ones that are not on it. A later utterance overrides an earlier one, so never return the same item as both "add" and "not_needed".
+
 Rules:
+- "action" is "add" for items to buy and "not_needed" for items that no longer need buying.
 - "name" is the plain singular product name in lower case, without quantities or filler words.
 - "quantity" is what was said ("2 dozen", "a gallon"), or an empty string.
 - "utterance_index" is the index of the utterance that best shows the item should be bought.
@@ -37,9 +40,10 @@ export const SCHEMA = {
           name: { type: 'string' },
           quantity: { type: 'string' },
           utterance_index: { type: 'integer' },
+          action: { type: 'string', enum: ['add', 'not_needed'] },
           reason: { type: 'string' },
         },
-        required: ['name', 'quantity', 'utterance_index', 'reason'],
+        required: ['name', 'quantity', 'utterance_index', 'action', 'reason'],
         additionalProperties: false,
       },
     },
@@ -57,6 +61,7 @@ export interface OutItem {
   name: string;
   quantity: string;
   utterance_index: number;
+  action: 'add' | 'not_needed';
   reason: string;
 }
 
@@ -83,9 +88,9 @@ export async function extract(client: ChatClient, model: string, utterances: InU
 
   const parsed = JSON.parse(message.content) as { items?: OutItem[] };
   const seen = new Set<string>();
-  return (parsed.items ?? []).filter((i) => {
-    const key = i.name.trim().toLowerCase();
-    const valid = key && Number.isInteger(i.utterance_index) && i.utterance_index >= 0 && i.utterance_index < utterances.length;
+  return (parsed.items ?? []).map((i) => ({ ...i, action: i.action === 'not_needed' ? ('not_needed' as const) : ('add' as const) })).filter((i) => {
+    const key = `${i.action}:${i.name.trim().toLowerCase()}`;
+    const valid = i.name.trim() && Number.isInteger(i.utterance_index) && i.utterance_index >= 0 && i.utterance_index < utterances.length;
     if (!valid || seen.has(key)) return false;
     seen.add(key);
     return true;

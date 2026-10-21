@@ -54,11 +54,32 @@ export function mergeExtracted(
 
   const added: ListItem[] = [];
   for (const e of extracted) {
+    if (e.notNeeded) continue;
     if (blocked.has(e.canonical)) continue;
     blocked.add(e.canonical);
     added.push(makeItem(newId(), { name: e.name, quantity: e.quantity, heardText: e.sourceText }, source, now));
   }
   return { state: added.length ? { ...state, items: [...state.items, ...added] } : state, added };
+}
+
+/**
+ * Takes open items off the list when the speakers said they are not needed. They move to history with
+ * the phrase that caused it, so nothing is lost. Bought and queued items are left alone.
+ */
+export function dismissNotNeeded(
+  state: PersistedState,
+  dropped: ExtractedItem[],
+  now: number,
+): { state: PersistedState; removed: ListItem[] } {
+  const removed: ListItem[] = [];
+  const items = state.items.filter((i) => {
+    const hit = i.status === 'open' && dropped.find((d) => d.canonical === i.canonical);
+    if (!hit) return true;
+    removed.push({ ...i, status: 'notNeeded', resolvedAt: now, notNeededText: hit.sourceText });
+    return false;
+  });
+  if (!removed.length) return { state, removed };
+  return { state: { ...state, items, history: [...removed, ...state.history].slice(0, HISTORY_CAP) }, removed };
 }
 
 export function recordHeard(

@@ -186,11 +186,15 @@ export default function ListScreen() {
                 <SectionTitle>{dayLabel(day.dayStart)}</SectionTitle>
                 {day.items.map((item) => (
                   <Card key={item.id} style={styles.row}>
-                    <Text style={{ color: t.accent, fontWeight: '800' }}>✓</Text>
-                    <Text style={{ color: t.muted, fontSize: 16, flex: 1 }}>
-                      {item.quantity ? `${item.quantity} ` : ''}
-                      {item.name}
-                    </Text>
+                    <Text style={{ color: item.status === 'notNeeded' ? t.muted : t.accent, fontWeight: '800' }}>{item.status === 'notNeeded' ? '✕' : '✓'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: t.muted, fontSize: 16 }}>
+                        {item.quantity ? `${item.quantity} ` : ''}
+                        {item.name}
+                        {item.status === 'notNeeded' ? ' (not needed)' : ''}
+                      </Text>
+                      {item.notNeededText && <Muted>“{item.notNeededText}”</Muted>}
+                    </View>
                   </Card>
                 ))}
               </View>
