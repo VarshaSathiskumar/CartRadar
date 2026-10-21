@@ -43,7 +43,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "extract": "node --env-file-if-exists=.env.local server/extract.ts",
-    "check-sample": "node --env-file-if-exists=.env.local server/check-sample.ts"
+    "check-sample": "node --env-file-if-exists=.env.local server/check-sample.ts",
+    "check-demo": "node --env-file-if-exists=.env.local server/check-demo.ts"
   },
   "private": true
 }

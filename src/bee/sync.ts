@@ -4,17 +4,12 @@ import { markSeen, mergeExtracted, recordHeard } from '../core/listLogic';
 import type { ListItem } from '../core/types';
 import { getBeeToken } from '../services/secrets';
 import { mutate, readState } from '../services/store';
-import { DemoBeeClient, HttpBeeClient, type BeeClient } from './client';
+import { HttpBeeClient, type BeeClient } from './client';
 import { extractWithLlm } from './llmExtractor';
 
 export class NotConnectedError extends Error {}
 
-// Kept at module level so the demo script advances across syncs within one app session.
-const demoClient = new DemoBeeClient();
-
 async function pickClient(): Promise<BeeClient> {
-  const { settings } = await readState();
-  if (settings.demoMode) return demoClient;
   // `bee proxy` (Bee CLI) injects the logged-in account's credentials, so no token is needed against it.
   const proxyUrl = process.env.EXPO_PUBLIC_BEE_PROXY_URL;
   if (proxyUrl) return new HttpBeeClient(undefined, proxyUrl);
@@ -30,6 +25,8 @@ export interface SyncResult {
 
 /** Pulls new Bee transcripts, extracts grocery items, and merges them into the list. */
 export async function syncFromBee(): Promise<SyncResult> {
+  // Demo mode owns the profile (see services/demo.ts); real conversations would mix into the mock data.
+  if ((await readState()).settings.demoMode) return { processed: 0, added: [] };
   const client = await pickClient();
   const utterances = await client.fetchRecentUtterances();
 

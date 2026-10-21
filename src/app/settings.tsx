@@ -6,6 +6,7 @@ import { useAuth } from '../components/AuthProvider';
 import { useTheme } from '../components/theme';
 import { Button, Card, Chip, Muted, Screen, SectionTitle, Toggle } from '../components/ui';
 import { updateSettings } from '../core/listLogic';
+import { disableDemo, enableDemo } from '../services/demo';
 import { clearBeeToken, getBeeToken, setBeeToken } from '../services/secrets';
 import { mutate, useAppState } from '../services/store';
 
@@ -18,6 +19,7 @@ export default function SettingsScreen() {
   const [token, setToken] = useState('');
   const [rescan, setRescan] = useState<{ busy: boolean; message?: string }>({ busy: false });
   const [hasToken, setHasToken] = useState(false);
+  const [demo, setDemo] = useState<{ busy: boolean; message?: string }>({ busy: false });
 
   useEffect(() => {
     void getBeeToken().then((v) => setHasToken(!!v));
@@ -34,6 +36,26 @@ export default function SettingsScreen() {
       setRescan({ busy: false, message: r.added.length ? `Added ${r.added.map((i) => i.name).join(', ')}.` : `Read ${r.processed} lines, nothing new to add.` });
     } catch (e) {
       setRescan({ busy: false, message: e instanceof Error ? e.message : 'Re-scan failed' });
+    }
+  };
+
+  // Demo mode fills the profile with mock conversations (and saves them like real data); turning it off clears them again.
+  const toggleDemo = async (on: boolean) => {
+    if (demo.busy) return;
+    setDemo({ busy: true });
+    try {
+      if (on) {
+        const r = await enableDemo();
+        setDemo({
+          busy: false,
+          message: `Added ${r.items} items from ${r.conversations} conversations.${r.usedModel ? '' : ' The extraction service was not reachable, so a simpler reader was used and fewer items were found.'}`,
+        });
+      } else {
+        await disableDemo();
+        setDemo({ busy: false, message: 'Demo data removed.' });
+      }
+    } catch (e) {
+      setDemo({ busy: false, message: e instanceof Error ? e.message : 'Demo mode failed' });
     }
   };
 
@@ -95,10 +117,12 @@ export default function SettingsScreen() {
         <Card>
           <Toggle
             title="Demo mode"
-            description="Feeds a scripted conversation instead of reading from Bee, so you can try the whole flow."
+            description="Fills your list, cart queue and history with mock conversations that the model reads like real ones. Turn it off to clear them."
             value={settings.demoMode}
-            onChange={(v) => void patch({ demoMode: v })}
+            onChange={(v) => void toggleDemo(v)}
           />
+          {demo.busy && <Muted style={{ marginTop: 8 }}>{settings.demoMode ? 'Clearing demo data...' : 'Reading the mock conversations...'}</Muted>}
+          {!demo.busy && demo.message && <Muted style={{ marginTop: 8 }}>{demo.message}</Muted>}
         </Card>
 
         <SectionTitle>Location</SectionTitle>

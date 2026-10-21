@@ -96,33 +96,3 @@ export function parseConversation(c: Raw): Utterance[] {
   }
   return [];
 }
-
-const DEMO_LINES = [
-  "Hey, how was your day?",
-  "Pretty good. Oh, we need to buy eggs, we're out of it.",
-  "Yeah and I think we ran out of noodles too, we need to buy it.",
-  "Did you see the game last night?",
-  "We should pick up a gallon of milk and some bread.",
-  "Don't forget we're running low on coffee.",
-  "We don't need rice, we already have plenty.",
-  "Add paper towels and dish soap to the grocery list.",
-  "I'm out of time, I have to run.",
-];
-
-/** Feeds a scripted conversation, two lines per call, so the full flow can be tried without a Bee device. */
-export class DemoBeeClient implements BeeClient {
-  private cursor = 0;
-  private round = 0;
-
-  async fetchRecentUtterances(): Promise<Utterance[]> {
-    const lines = DEMO_LINES.slice(this.cursor, this.cursor + 2);
-    const now = Date.now();
-    const out = lines.map((text, i) => ({ id: `demo:${this.round}:${this.cursor + i}`, text, at: now + i }));
-    this.cursor += 2;
-    if (this.cursor >= DEMO_LINES.length) {
-      this.cursor = 0;
-      this.round += 1;
-    }
-    return out;
-  }
-}
