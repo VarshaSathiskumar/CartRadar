@@ -33,3 +33,9 @@ export function formatMiles(meters: number): string {
 export function googleMapsDirectionsUrl(to: { latitude: number; longitude: number }): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${to.latitude},${to.longitude}`;
 }
+
+/** Opens a store on Google Maps: by name and address when known (so the listing shows), otherwise by its coordinates. */
+export function googleMapsPlaceUrl(store: { name: string; address?: string; latitude: number; longitude: number }): string {
+  const query = store.address ? `${store.name}, ${store.address}` : `${store.latitude},${store.longitude}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}

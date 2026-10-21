@@ -1,5 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { googleMapsPlaceUrl } from '../core/geo';
 import type { Store } from '../core/types';
 import type { Coords } from '../services/location';
 
@@ -23,7 +24,13 @@ export function StoreMap({ user, stores, userLabel }: StoreMapProps) {
     >
       {user && <Marker coordinate={user} title={userLabel ?? 'You are here'} pinColor="blue" />}
       {stores.map((s) => (
-        <Marker key={s.id} coordinate={{ latitude: s.latitude, longitude: s.longitude }} title={s.name} />
+        <Marker
+          key={s.id}
+          coordinate={{ latitude: s.latitude, longitude: s.longitude }}
+          title={s.name}
+          description="Tap to open in Google Maps"
+          onCalloutPress={() => void Linking.openURL(googleMapsPlaceUrl(s))}
+        />
       ))}
     </MapView>
   );

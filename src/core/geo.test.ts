@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { distanceMeters, formatMiles, googleMapsDirectionsUrl, metersToMiles, milesText, parseReminderMiles } from './geo';
+import { distanceMeters, formatMiles, googleMapsDirectionsUrl, googleMapsPlaceUrl, metersToMiles, milesText, parseReminderMiles } from './geo';
 
 describe('distance helpers', () => {
   it('converts meters to miles', () => {
@@ -40,5 +40,16 @@ describe('reminder distance in miles', () => {
     expect(milesText(250)).toBe('0.16');
     expect(milesText(1609)).toBe('1');
     expect(milesText(805)).toBe('0.5');
+  });
+});
+
+describe('googleMapsPlaceUrl', () => {
+  it('searches by name and address when the store has one', () => {
+    const url = googleMapsPlaceUrl({ name: 'Kroger', address: '1 Main St, Denver', latitude: 1, longitude: 2 });
+    expect(url).toBe('https://www.google.com/maps/search/?api=1&query=Kroger%2C%201%20Main%20St%2C%20Denver');
+  });
+
+  it('falls back to the coordinates without an address', () => {
+    expect(googleMapsPlaceUrl({ name: 'Kroger', latitude: 39.75, longitude: -105.22 })).toBe('https://www.google.com/maps/search/?api=1&query=39.75%2C-105.22');
   });
 });
