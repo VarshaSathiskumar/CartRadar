@@ -323,7 +323,7 @@ For the demo, users can open the website on their phones, allow location access,
 
 **Live Web Demo:** https://cartradar-five.vercel.app/
 
-**Getting Started with local setup:** 
+**Getting Started with local setup:** https://github.com/VarshaSathiskumar/CartRadar/blob/main/src/README.md
 
 ## License
 
