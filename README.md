@@ -18,6 +18,9 @@ But those conversations rarely make it into our shopping lists.
 
 CartRadar bridges that gap by turning conversational information into actionable reminders.
 
+* Context-Aware Shopping Intelligence: Uses OpenAI to understand purchase intent, conversational corrections, and completed purchases across Bee conversations, automatically adding, updating, deduplicating, or marking grocery items as purchased without manual intervention.
+
+
 ## Hackathon Submission
 
 **Track:** Bee
