@@ -1,4 +1,4 @@
-import { authorize, corsHeaders, json } from '../_shared/auth.ts';
+import { authorize, json, preflight } from '../_shared/auth.ts';
 import { changedSince, toUtterances, type BeeConversation, type BeeConversationSummary, type Utterance } from './bee.ts';
 
 /**
@@ -30,13 +30,13 @@ async function bee<T>(path: string): Promise<T> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
-  if (req.method !== 'POST') return json(405, { error: 'method not allowed' });
-
-  const auth = await authorize(req);
-  if (auth instanceof Response) return auth;
-
+  if (req.method === 'OPTIONS') return preflight(req);
   try {
+    if (req.method !== 'POST') return json(req, 405, { error: 'method not allowed' });
+
+    const auth = await authorize(req);
+    if (auth instanceof Response) return auth;
+
     const body = (await req.json().catch(() => ({}))) as { since?: number; limit?: number };
     const limit = Math.min(Math.max(Math.trunc(Number(body.limit)) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const since = Number.isFinite(body.since) ? body.since : undefined;
@@ -46,9 +46,10 @@ Deno.serve(async (req) => {
 
     const details = await Promise.all(wanted.map((c) => bee<{ conversation: BeeConversation }>(`/v1/conversations/${encodeURIComponent(String(c.id))}`)));
     const utterances: Utterance[] = details.flatMap((d) => toUtterances(d.conversation)).sort((a, b) => a.at - b.at);
-    return json(200, { utterances, conversations: wanted.length });
+    return json(req, 200, { utterances, conversations: wanted.length });
   } catch (e) {
-    if (e instanceof BeeError) return json(502, { error: e.message });
-    return json(500, { error: e instanceof Error ? e.message : 'unknown error' });
+    console.error('bee-sync failed:', e instanceof Error ? e.message : e);
+    if (e instanceof BeeError) return json(req, 502, { error: e.message });
+    return json(req, 500, { error: e instanceof Error ? e.message : 'unknown error' });
   }
 });
