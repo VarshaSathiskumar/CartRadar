@@ -8,6 +8,7 @@ import { useAuth } from '../components/AuthProvider';
 import { BottomSheet } from '../components/BottomSheet';
 import { StoreMap } from '../components/StoreMap';
 import { SwipeableRow, useJustDragged } from '../components/SwipeableRow';
+import { DemoBanner } from '../components/DemoBanner';
 import { TopBar } from '../components/TopBar';
 import { Button, Card, Muted, SectionTitle } from '../components/ui';
 import { extractItems } from '../core/extractor';
@@ -111,6 +112,7 @@ export default function ListScreen() {
   return (
     <View style={styles.root}>
       <TopBar name={firstName} subtitle={toBuy ? `${toBuy} ${toBuy === 1 ? 'item' : 'items'} to buy` : 'Nothing to buy yet'} location={locationLabel} />
+      <DemoBanner />
       <View style={styles.mapArea}>
         <StoreMap user={mapCentre} stores={mapStores} userLabel={zipCentre ? 'Search area' : 'You are here'} />
 

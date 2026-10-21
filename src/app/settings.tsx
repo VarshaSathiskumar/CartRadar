@@ -74,9 +74,9 @@ export default function SettingsScreen() {
           {sync.phase === 'done' && <Muted style={{ marginTop: 8 }}>{sync.message}</Muted>}
           {sync.phase === 'error' && <Text style={{ color: t.danger, marginTop: 8, fontSize: 13 }}>Sync failed: {sync.message}</Text>}
         </Card>
-        <Card>
+        <Card style={settings.demoMode ? { borderColor: t.warn, borderWidth: 1.5, backgroundColor: t.warnBg } : undefined}>
           <Toggle
-            title="Demo mode"
+            title={settings.demoMode ? 'Demo mode is on' : 'Demo mode'}
             description="Fills your list, cart queue and history with mock conversations that the model reads like real ones. Turn it off to clear them."
             value={settings.demoMode}
             onChange={(v) => void toggleDemo(v)}
