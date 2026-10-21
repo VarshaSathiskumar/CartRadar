@@ -45,7 +45,7 @@ export default function LoginScreen() {
           <Text style={{ fontSize: 20 }}>📱</Text>
           <Text style={{ flex: 1, color: t.muted, fontSize: 13, lineHeight: 18 }}>
             <Text style={{ color: t.text, fontWeight: '700' }}>Best on mobile. </Text>
-            Use CartRadar on your phone for the complete experience, including store reminders that work when the app is closed.
+            Use the CartRadar mobile web app on your phone for the complete experience and to get store reminders.
           </Text>
         </View>
       )}
