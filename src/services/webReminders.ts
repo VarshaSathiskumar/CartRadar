@@ -35,13 +35,16 @@ export function dismissWebReminder(key: string): void {
 let watchId: number | undefined;
 let inside: ReadonlySet<string> = new Set();
 let busy = false;
+/** Set on a page load or zip change: the next check ignores the cooldown, once there are stores to check. */
+let forceNext = false;
 
 async function onPosition(pos: GeolocationPosition) {
   if (busy) return; // fixes can arrive faster than the state is read and saved
   busy = true;
   try {
     const found = await mutate((s) => {
-      const r = checkProximity(s, pos.coords, inside, Date.now());
+      const r = checkProximity(s, pos.coords, inside, Date.now(), forceNext);
+      if (s.stores.length > 0) forceNext = false;
       inside = r.inside;
       return { state: r.state, result: r.reminders };
     });
@@ -62,7 +65,8 @@ async function onPosition(pos: GeolocationPosition) {
  * Starts watching the position while the page is open (the browser asks for permission on first use).
  * Safe to call again; stopWebReminders turns it off and forgets which stores the user was inside.
  */
-export function startWebReminders(): void {
+export function startWebReminders(ignoreCooldown = false): void {
+  if (ignoreCooldown) forceNext = true;
   if (watchId !== undefined) return;
   if (typeof navigator === 'undefined' || !navigator.geolocation) return set({ status: 'unavailable' });
   watchId = navigator.geolocation.watchPosition(
@@ -85,5 +89,6 @@ export function stopWebReminders(): void {
   if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
   watchId = undefined;
   inside = new Set();
+  forceNext = false;
   set({ status: 'off', reminders: [] });
 }

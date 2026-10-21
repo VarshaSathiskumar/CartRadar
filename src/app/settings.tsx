@@ -110,7 +110,7 @@ export default function SettingsScreen() {
           />
           {Platform.OS === 'web' && settings.remindersEnabled && (
             <Muted style={{ marginTop: 8 }}>
-              {webReminders.status === 'tracking' && 'Checking your location while this page is open. You will see a reminder within 5 miles of a saved store.'}
+              {webReminders.status === 'tracking' && 'Checking your location while this page is open. You will see a reminder within 1.5 miles of a saved store.'}
               {webReminders.status === 'denied' && 'Location is blocked. Allow it for this site in your browser settings (iPhone: Settings, Safari, Location), then reload.'}
               {webReminders.status === 'unavailable' && 'This browser cannot share your location.'}
               {webReminders.status === 'off' && 'Waiting for location permission. Reminders only appear while this page is open.'}

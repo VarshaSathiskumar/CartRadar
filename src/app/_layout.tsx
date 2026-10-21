@@ -73,16 +73,18 @@ function AppTabs() {
 
   // Web has no background geofencing, so while the page is visible and the feature is on, the browser position is watched.
   const remindersOn = state.settings.remindersEnabled;
+  const zip = state.settings.zip;
   useEffect(() => {
     if (Platform.OS !== 'web' || status !== 'signedIn' || !remindersOn) return;
     const sync = () => (document.visibilityState === 'visible' ? startWebReminders() : stopWebReminders());
-    sync();
+    // Running this effect means a page load or a zip change, which remind even inside the cooldown.
+    if (document.visibilityState === 'visible') startWebReminders(true);
     document.addEventListener('visibilitychange', sync);
     return () => {
       document.removeEventListener('visibilitychange', sync);
       stopWebReminders();
     };
-  }, [status, remindersOn]);
+  }, [status, remindersOn, zip]);
 
   if (status === 'loading') {
     return (

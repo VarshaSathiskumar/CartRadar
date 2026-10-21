@@ -10,7 +10,7 @@ const base: PersistedState = { ...EMPTY_STATE, stores: [store], items: [item] };
 const at = (metres: number) => ({ latitude: 40 + metres / 111_320, longitude: -74 });
 
 describe('checkProximity', () => {
-  it('reminds once on entering 5 miles, not before', () => {
+  it('reminds once on entering 1.5 miles, not before', () => {
     expect(checkProximity(base, at(R + 100), new Set(), 1).reminders).toHaveLength(0);
     const r = checkProximity(base, at(R - 50), new Set(), 1);
     expect(r.reminders).toHaveLength(1);
@@ -30,6 +30,12 @@ describe('checkProximity', () => {
     const left = checkProximity(r.state, at(R + 500), r.inside, 2);
     expect(checkProximity(left.state, at(R / 2), left.inside, 3).reminders).toHaveLength(0);
     expect(checkProximity(left.state, at(R / 2), left.inside, NOTIFY_COOLDOWN_MS + 2).reminders).toHaveLength(1);
+  });
+
+  it('ignores the cooldown when asked to (page load or zip change)', () => {
+    const r = checkProximity(base, at(R / 2), new Set(), 1);
+    expect(checkProximity(r.state, at(R / 2), new Set(), 2).reminders).toHaveLength(0);
+    expect(checkProximity(r.state, at(R / 2), new Set(), 2, true).reminders).toHaveLength(1);
   });
 
   it('skips disabled stores and empty lists', () => {
