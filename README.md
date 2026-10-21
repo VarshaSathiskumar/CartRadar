@@ -18,6 +18,16 @@ But those conversations rarely make it into our shopping lists.
 
 CartRadar bridges that gap by turning conversational information into actionable reminders.
 
+## Hackathon Submission
+
+**Track:** Bee
+
+**Demo Video:** [Add YouTube link]
+
+**Live Web Demo:** https://cartradar-five.vercel.app/
+
+**Getting Started with local setup:** https://github.com/VarshaSathiskumar/CartRadar/blob/main/src/README.md
+
 ## Features
 
 | Feature | Description |
@@ -301,15 +311,7 @@ For the demo, users can open the website on their phones, allow location access,
 - Add smarter grocery categorization.
 - Explore direct retailer-cart integrations through supported partner APIs.
 
-## Hackathon Submission
 
-**Track:** Bee
-
-**Demo Video:** [Add YouTube link]
-
-**Live Web Demo:** https://cartradar-five.vercel.app/
-
-**Getting Started with local setup:** https://github.com/VarshaSathiskumar/CartRadar/blob/main/src/README.md
 
 ## License
 
