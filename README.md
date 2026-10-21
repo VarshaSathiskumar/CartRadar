@@ -212,192 +212,6 @@ After a shopping trip, unfinished items can remain on the list or move to the Ca
 | Web deployment | Vercel |
 | Testing | Unit tests and TypeScript type checking |
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js and npm
-- Expo development environment
-- Supabase project
-- OpenAI API key
-- Bee developer access and a valid Bee token
-- Google OAuth credentials
-- Android or iOS development environment for native features
-
-### 1. Clone the Repository
-
-```bash
-git clone <YOUR_REPOSITORY_URL>
-cd CartRadar
-```
-
-### 2. Install Dependencies
-
-```bash
-npm install
-```
-
-### 3. Configure Environment Variables
-
-Configure the following public application variables:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=
-EXPO_PUBLIC_SUPABASE_ANON_KEY=
-EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=
-```
-
-These are client-side configuration values.
-
-Never place Bee authentication tokens, OpenAI API keys, or Supabase service-role credentials in variables prefixed with `EXPO_PUBLIC_`.
-
-### 4. Configure Supabase
-
-Log in and link your Supabase project:
-
-```bash
-npx supabase login
-npx supabase link --project-ref <PROJECT_REF>
-```
-
-Apply the database schema in:
-
-```text
-supabase/migrations/0001_init.sql
-```
-
-Configure Google authentication in Supabase.
-
-### 5. Configure Server Secrets
-
-Copy the example environment file:
-
-```text
-supabase/functions/.env.example
-```
-
-Create:
-
-```text
-supabase/functions/.env
-```
-
-Fill in the required server-side credentials, including the Bee token, OpenAI key, and allowed-user configuration.
-
-Upload the secrets:
-
-```bash
-npx supabase secrets set --env-file supabase/functions/.env
-```
-
-Never commit this file.
-
-### 6. Deploy Edge Functions
-
-```bash
-npx supabase functions deploy bee-sync --no-verify-jwt
-
-npx supabase functions deploy extract-items --no-verify-jwt
-```
-
-The functions implement application-level session verification in:
-
-```text
-supabase/functions/_shared/auth.ts
-```
-
-Disabling gateway JWT verification does not mean the endpoints should be publicly accessible without authentication.
-
-### 7. Run the Application
-
-Install dependencies and run the project checks:
-
-```bash
-npm install
-npm test
-npm run typecheck
-```
-
-For Android:
-
-```bash
-npx expo run:android
-```
-
-For iOS:
-
-```bash
-npx expo run:ios
-```   
-
-Alternatively, use an Expo development build:
-
-```bash
-npx eas-cli build --profile development
-```
-
-**Important:** Background location monitoring, geofencing, and background tasks require a compatible native build. Expo Go and the browser-based deployment do not provide the complete native feature set.
-
-## Web Deployment
-
-CartRadar also supports web deployment through Vercel.
-
-The repository includes `vercel.json`, which configures the Expo web build, output directory, and single-page application routing.
-
-### Deploy to Vercel
-
-1. Import the GitHub repository into Vercel.
-2. Configure the required public environment variables.
-3. Deploy the application.
-4. Add the deployed URL to the Google OAuth authorized JavaScript origins.
-5. Configure the corresponding Supabase Authentication URL settings.
-6. Redeploy if build-time environment variables change.
-
-The web deployment supports the application features compatible with browser APIs.
-
-Native background geofencing is not available in the web version.
-
-## Testing Bee Integration
-
-CartRadar connects to the Bee Developer API:
-
-```text
-https://api.developer.bee.amazon.dev
-```
-
-The integration uses:
-
-```http
-GET /v1/conversations
-GET /v1/conversations/:id
-```
-
-The first endpoint retrieves recent conversations.
-
-The second retrieves individual conversation details, including transcription data where available.
-
-### Test the Connection
-
-With a valid Bee token configured locally:
-
-```bash
-curl \
-  -H "Authorization: Bearer $BEE_TOKEN" \
-  https://api.developer.bee.amazon.dev/v1/me
-```
-
-To test the application:
-
-1. Sign in to CartRadar.
-2. Open Settings.
-3. Select **Sync now**.
-4. Verify the synchronization status.
-5. Mention a grocery item in a conversation captured by Bee.
-6. Wait for the conversation to become available through Bee.
-7. Sync CartRadar again.
-8. Verify that the grocery item appears in the shopping list.
-
-This demonstrates the live Bee integration rather than the scripted demo.
 
 ## Demo Mode
 
@@ -430,69 +244,68 @@ Conversation text is sent to OpenAI for extraction.
 
 Users are responsible for obtaining any consent required when recording conversations involving other people.
 
-## Known Limitations
+## 📍 Location-Based Store Reminders
 
-### Bee Authentication
+CartRadar reminds users about their shopping list when they are near a saved store. Both mobile and web use the same settings and reminder rules, but detect location differently.
 
-The Bee Developer API requires a Bearer token.
+### How It Works
 
-The currently documented API does not provide a clearly described token acquisition and refresh workflow for this integration.
+1. Users save stores and set a reminder radius (default: 250 meters).
+2. The app checks whether the user enters a store's radius.
+3. If the store is enabled and the shopping list has unchecked items, a reminder is triggered.
+4. A 2-hour cooldown prevents repeated reminders for the same store.
+5. If multiple stores are nearby, they are combined into one notification.
 
-If the token expires, CartRadar requires an updated server-side token.
+### Mobile vs. Web
 
-### Bee API Response Format
+| Feature | Mobile App | Web App |
+|---|---|---|
+| Location detection | OS geofencing | Browser GPS |
+| Radius | Customizable (0.1–5 miles) | Same |
+| Default radius | 250 meters | 250 meters |
+| Distance calculation | Operating system | Application |
+| Reminder trigger | Enter store radius | Enter store radius |
+| Background tracking | Supported with permissions | Not supported |
+| Exit detection | OS-managed | 50 m beyond radius |
+| Reminder cooldown | 2 hours | 2 hours |
+| Shopping list validation | Yes | Yes |
+| Multiple nearby stores | Combined reminder | Combined reminder |
+| Settings synchronization | Supabase | Supabase |
 
-The integration uses conversation response fields observed from a live Bee account.
+### Reminder Settings
 
-Some response fields are not fully documented and may change.
+- **Custom radius:** Users can choose between 0.1 and 5 miles.
+- **Store preferences:** Enable or disable reminders for individual stores.
+- **Shopping list:** Reminders trigger only when unchecked items remain.
+- **Cooldown:** Prevents duplicate reminders within 2 hours per store.
+- **Cloud sync:** Settings are saved in Supabase and shared across devices.
+- **Map visualization:** Displays the configured reminder radius.
 
-### Native Geofencing
+### Technical Implementation
 
-Background geofencing requires native location permissions and compatible operating-system support.
+**Mobile App (iOS/Android)**
+- Uses native OS geofencing.
+- Requires "Always" location permission and a development build.
+- Can detect store entry even when the app is closed.
+- Updating the radius re-registers geofences.
+- Actual trigger distances may vary due to OS behavior.
 
-iOS limits the number of monitored regions. CartRadar monitors up to 15 nearby stores.
+**Web App (Mobile Browser)**
+- Uses `navigator.geolocation.watchPosition` to track location.
+- Calculates distance to enabled stores using the configured radius.
+- Applies radius changes automatically on the next location update.
+- Uses a 50-meter exit buffer to prevent repeated alerts from GPS fluctuations.
+- Checks location again when the page becomes visible, bypassing the normal cooldown for that recheck.
+- **Limitation:** Location tracking works only while the browser page is open and visible.
 
-Actual delivery timing is controlled by the operating system and is not guaranteed.
+### Demo Deployment
 
-### Retailer Integration
+CartRadar is deployed as a mobile-friendly web application.
 
-The Cart queue opens product searches in external shopping services.
+For the demo, users can open the website on their phones, allow location access, and receive store reminders when entering the configured radius.
 
-It does not automatically insert items into a user's retailer cart.
+**Note:** Browser-based location reminders require the webpage to remain open and visible. Background geofencing requires a native mobile app.
 
-### Cross-Device Deduplication
-
-Processed conversation identifiers are tracked per device.
-
-A new device may reprocess older conversations, although shopping-list deduplication prevents many duplicate entries.
-
-## Project Structure
-
-```text
-CartRadar/
-├── src/
-│   ├── app/
-│   │   └── Application screens
-│   ├── bee/
-│   │   └── Bee synchronization pipeline
-│   ├── core/
-│   │   └── Extraction and shopping logic
-│   └── services/
-│       └── Storage, location, notifications
-│
-├── supabase/
-│   ├── migrations/
-│   │   └── 0001_init.sql
-│   └── functions/
-│       ├── bee-sync/
-│       ├── extract-items/
-│       └── _shared/
-│
-├── package.json
-├── vercel.json
-├── README.md
-└── LICENSE
-```
 
 ## Future Improvements
 
@@ -510,6 +323,7 @@ CartRadar/
 
 **Live Web Demo:** https://cartradar-five.vercel.app/
 
+**Getting Started with local setup:** 
 
 ## License
 
