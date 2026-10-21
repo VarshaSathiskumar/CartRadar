@@ -1,5 +1,5 @@
 import { Linking, StyleSheet } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Circle, Marker } from 'react-native-maps';
 import { googleMapsPlaceUrl } from '../core/geo';
 import type { Store } from '../core/types';
 import type { Coords } from '../services/location';
@@ -9,9 +9,11 @@ export interface StoreMapProps {
   stores: Store[];
   /** What the user marker is called: "You are here" or the zip search area. */
   userLabel?: string;
+  /** Reminder distance, drawn as a circle around the user marker. */
+  radiusM?: number;
 }
 
-export function StoreMap({ user, stores, userLabel }: StoreMapProps) {
+export function StoreMap({ user, stores, userLabel, radiusM }: StoreMapProps) {
   const centre = user ?? stores[0];
   return (
     <MapView
@@ -23,6 +25,9 @@ export function StoreMap({ user, stores, userLabel }: StoreMapProps) {
       }
     >
       {user && <Marker coordinate={user} title={userLabel ?? 'You are here'} pinColor="blue" />}
+      {user && radiusM ? (
+        <Circle center={user} radius={radiusM} strokeColor="rgba(31,138,76,0.9)" fillColor="rgba(31,138,76,0.15)" strokeWidth={2} />
+      ) : null}
       {stores.map((s) => (
         <Marker
           key={s.id}

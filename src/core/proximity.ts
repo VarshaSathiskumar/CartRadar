@@ -2,8 +2,6 @@ import { distanceMeters } from './geo';
 import { NOTIFY_COOLDOWN_MS, openItems } from './listLogic';
 import type { ListItem, PersistedState, Store } from './types';
 
-/** How close counts as "at the store" for reminders shown while the app is open. */
-export const WEB_REMINDER_RADIUS_M = Math.round(1.5 * 1609.344);
 /** A store already counted as entered only counts as left beyond this extra distance, so GPS jitter at the edge cannot repeat a reminder. */
 export const EXIT_MARGIN_M = 50;
 
@@ -35,7 +33,7 @@ export function checkProximity(
     if (!store.enabled) continue;
     const d = distanceMeters(here, store);
     const wasInside = inside.has(store.id);
-    if (d > WEB_REMINDER_RADIUS_M + (wasInside ? EXIT_MARGIN_M : 0)) continue;
+    if (d > state.settings.geofenceRadiusM + (wasInside ? EXIT_MARGIN_M : 0)) continue;
     nextInside.add(store.id);
     if (wasInside || items.length === 0) continue;
     const last = lastNotifiedAt[store.id];

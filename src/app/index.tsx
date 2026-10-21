@@ -114,7 +114,7 @@ export default function ListScreen() {
       <TopBar name={firstName} subtitle={toBuy ? `${toBuy} ${toBuy === 1 ? 'item' : 'items'} to buy` : 'Nothing to buy yet'} location={locationLabel} />
       <DemoBanner />
       <View style={styles.mapArea}>
-        <StoreMap user={mapCentre} stores={mapStores} userLabel={zipCentre ? 'Search area' : 'You are here'} />
+        <StoreMap user={mapCentre} stores={mapStores} userLabel={zipCentre ? 'Search area' : 'You are here'} radiusM={state.settings.geofenceRadiusM} />
 
         <BottomSheet>
           <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>

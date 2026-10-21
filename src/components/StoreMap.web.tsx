@@ -24,7 +24,7 @@ function storePopup(store: StoreMapProps['stores'][number]): HTMLElement {
   return box;
 }
 
-export function StoreMap({ user, stores, userLabel }: StoreMapProps) {
+export function StoreMap({ user, stores, userLabel, radiusM }: StoreMapProps) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -55,6 +55,11 @@ export function StoreMap({ user, stores, userLabel }: StoreMapProps) {
       const p: L.LatLngTuple = [user.latitude, user.longitude];
       L.circleMarker(p, { radius: 9, color: '#ffffff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }).bindTooltip(userLabel ?? 'You are here').addTo(group);
       points.push(p);
+      if (radiusM) {
+        const ring = L.circle(p, { radius: radiusM, color: '#1F8A4C', weight: 2, fillColor: '#1F8A4C', fillOpacity: 0.15, interactive: false }).addTo(group);
+        const b = ring.getBounds();
+        points.push([b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]);
+      }
     }
     for (const s of stores) {
       const p: L.LatLngTuple = [s.latitude, s.longitude];
@@ -70,7 +75,7 @@ export function StoreMap({ user, stores, userLabel }: StoreMapProps) {
       points.push(p);
     }
     if (points.length) m.fitBounds(L.latLngBounds(points), { maxZoom: 15, padding: [40, 40], paddingBottomRight: [40, SHEET_PADDING_PX] });
-  }, [user?.latitude, user?.longitude, userLabel, stores]);
+  }, [user?.latitude, user?.longitude, userLabel, stores, radiusM]);
 
   return createElement('div', { ref: el, style: { position: 'absolute', inset: 0, zIndex: 0, isolation: 'isolate' } });
 }

@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { NOTIFY_COOLDOWN_MS } from './listLogic';
-import { checkProximity, claimNearbyStores, WEB_REMINDER_RADIUS_M as R } from './proximity';
+import { checkProximity, claimNearbyStores } from './proximity';
 import { EMPTY_STATE } from './types';
 import type { ListItem, PersistedState, Store } from './types';
 
 const store: Store = { id: 's1', name: 'Market', latitude: 40, longitude: -74, enabled: true } as Store;
 const item = { id: 'i1', name: 'eggs', canonical: 'egg', status: 'open', source: 'manual', addedAt: 0, carriedOver: 0 } as ListItem;
 const base: PersistedState = { ...EMPTY_STATE, stores: [store], items: [item] };
+const R = base.settings.geofenceRadiusM;
 const at = (metres: number) => ({ latitude: 40 + metres / 111_320, longitude: -74 });
 
 describe('checkProximity', () => {
-  it('reminds once on entering 1.5 miles, not before', () => {
+  it('reminds once on entering the saved radius, not before', () => {
     expect(checkProximity(base, at(R + 100), new Set(), 1).reminders).toHaveLength(0);
     const r = checkProximity(base, at(R - 50), new Set(), 1);
     expect(r.reminders).toHaveLength(1);
