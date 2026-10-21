@@ -22,7 +22,7 @@ CartRadar bridges that gap by turning conversational information into actionable
 
 **Track:** Bee
 
-**Demo Video:** [Add YouTube link]
+**Demo Video:** https://youtu.be/qVKjGgMns0w
 
 **Live Web Demo:** https://cartradar-five.vercel.app/
 
