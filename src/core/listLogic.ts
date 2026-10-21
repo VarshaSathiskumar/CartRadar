@@ -231,13 +231,11 @@ export function orderQueuedItem(state: PersistedState, id: string, now: number):
   };
 }
 
-export function reminderText(store: Store, items: ListItem[]): { title: string; body: string } {
-  const names = items.map((i) => (i.quantity ? `${i.quantity} ${i.name}` : i.name));
-  const shown = names.slice(0, 5).join(', ');
-  const more = names.length > 5 ? ` +${names.length - 5} more` : '';
+/** `others` is how many more stores are nearby at the same time; they share this one reminder. */
+export function reminderText(store: Store, others = 0): { title: string; body: string } {
   return {
-    title: `You're near ${store.name}`,
-    body: `${items.length} ${items.length === 1 ? 'item' : 'items'} to pick up: ${shown}${more}`,
+    title: `You're near ${store.name}${others > 0 ? ` + ${others} ${others === 1 ? 'other' : 'others'}` : ''}`,
+    body: "Don't forget to pick up your grocery items.",
   };
 }
 

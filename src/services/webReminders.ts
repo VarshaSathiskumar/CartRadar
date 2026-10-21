@@ -51,10 +51,8 @@ async function onPosition(pos: GeolocationPosition) {
     if (!found?.length) return;
     const now = Date.now();
     set({
-      reminders: [
-        ...view.reminders.filter((r) => !found.some((f) => r.key.startsWith(`${f.store.id}:`))),
-        ...found.map((f) => ({ key: `${f.store.id}:${now}`, ...reminderText(f.store, f.items) })),
-      ],
+      // Stores reached by the same fix share one reminder.
+      reminders: [{ key: `nearby:${now}`, ...reminderText(found[0].store, found.length - 1) }],
     });
   } finally {
     busy = false;

@@ -190,11 +190,15 @@ describe('orderQueuedItem', () => {
 });
 
 describe('reminderText', () => {
-  it('summarises long lists', () => {
-    const s = add(withStore(), 'we need eggs, milk, bread, rice, butter, cheese and coffee');
-    const { title, body } = reminderText(store, s.items);
+  it('names the store without listing items', () => {
+    const { title, body } = reminderText(store);
     expect(title).toBe("You're near Kroger");
-    expect(body).toBe('7 items to pick up: eggs, milk, bread, rice, butter +2 more');
+    expect(body).toBe("Don't forget to pick up your grocery items.");
+  });
+
+  it('combines nearby stores into one title', () => {
+    expect(reminderText(store, 1).title).toBe("You're near Kroger + 1 other");
+    expect(reminderText(store, 4).title).toBe("You're near Kroger + 4 others");
   });
 });
 
