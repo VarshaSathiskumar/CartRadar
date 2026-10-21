@@ -21,6 +21,7 @@ const statusMessage: Record<GeofenceStatus, string> = {
   'no-stores': 'No stores selected',
   'foreground-denied': 'Location permission denied. Enable it in system settings.',
   'background-denied': 'Choose “Always” for location so reminders work when the app is closed.',
+  unavailable: 'Store reminders are not available here. Expo Go cannot watch for stores in the background; use a development build.',
 };
 
 export default function LocationScreen() {

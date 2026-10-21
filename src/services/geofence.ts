@@ -1,14 +1,22 @@
 import * as Location from 'expo-location';
-import * as TaskManager from 'expo-task-manager';
-import { handleEnter, handleExit, reminderText, tripText } from '../core/listLogic';
-import { CART_PROVIDERS } from './cart';
-import { notifyNow } from './notifications';
+import { handleEnter, handleExit, leftoverPromptText, reminderText, tripText } from '../core/listLogic';
+import { LEFTOVERS_CATEGORY, notifyNow } from './notifications';
 import { mutate, readState } from './store';
 
 export const GEOFENCE_TASK = 'cartradar-geofence';
 
+/** Loaded defensively: it throws if its native code is missing (some Expo Go builds), which would crash the whole app. */
+function loadTaskManager(): typeof import('expo-task-manager') | undefined {
+  try {
+    return require('expo-task-manager');
+  } catch {
+    return undefined;
+  }
+}
+const TaskManager = loadTaskManager();
+
 /** Registered at module load (imported from the root layout) so the OS can wake the app for it. */
-TaskManager.defineTask<{ eventType: Location.GeofencingEventType; region: Location.LocationRegion }>(
+TaskManager?.defineTask<{ eventType: Location.GeofencingEventType; region: Location.LocationRegion }>(
   GEOFENCE_TASK,
   async ({ data, error }) => {
     if (error || !data) return;
@@ -30,19 +38,33 @@ TaskManager.defineTask<{ eventType: Location.GeofencingEventType; region: Locati
         const d = handleExit(s, storeId, now);
         return { state: d.state, result: d };
       });
+      if (decision?.prompt) {
+        const { title, body } = leftoverPromptText(decision.prompt);
+        await notifyNow(title, body, { screen: 'list', itemIds: decision.prompt.items.map((i) => i.id) }, LEFTOVERS_CATEGORY);
+      }
       if (decision?.trip) {
         const settings = (await readState()).settings;
-        const text = tripText(decision.trip, CART_PROVIDERS[settings.cartProvider].label);
+        const text = tripText(decision.trip);
         if (text) await notifyNow(text.title, text.body, { screen: settings.leftoversToCart ? 'cart' : 'list' });
       }
     }
   },
 );
 
-export type GeofenceStatus = 'active' | 'no-stores' | 'foreground-denied' | 'background-denied';
+export type GeofenceStatus = 'active' | 'no-stores' | 'foreground-denied' | 'background-denied' | 'unavailable';
 
 /** (Re)registers geofences for the enabled stores. Call after the store list, toggles or radius change. */
 export async function syncGeofences(): Promise<GeofenceStatus> {
+  try {
+    return await registerGeofences();
+  } catch {
+    // Expo Go cannot do background location, and some devices refuse region monitoring; never let that crash a screen.
+    return 'unavailable';
+  }
+}
+
+async function registerGeofences(): Promise<GeofenceStatus> {
+  if (!TaskManager) return 'unavailable';
   const state = await readState();
   const stores = state.stores.filter((s) => s.enabled);
 

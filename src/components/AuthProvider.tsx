@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { authEnabled, restoreSession, signOut as signOutRequest, type User } from '../services/auth';
+import { authEnabled, onSessionEnded, restoreSession, signOut as signOutRequest, type User } from '../services/auth';
+import { startCloudSync } from '../services/cloudSync';
 
 type Status = 'loading' | 'signedOut' | 'signedIn';
 
@@ -22,7 +23,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
       setStatus(u ? 'signedIn' : 'signedOut');
     });
+    return onSessionEnded(() => {
+      setUser(null);
+      setStatus('signedOut');
+    });
   }, []);
+
+  // Keeps the list, settings and stores in step with the account while signed in.
+  const userId = user?.id;
+  useEffect(() => (userId ? startCloudSync(userId) : undefined), [userId]);
 
   const signedIn = useCallback((u: User) => {
     setUser(u);

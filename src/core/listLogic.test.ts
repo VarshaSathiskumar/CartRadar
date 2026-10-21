@@ -9,6 +9,9 @@ import {
   groupHistoryByDay,
   handleEnter,
   handleExit,
+  leftoverPromptText,
+  orderQueuedItem,
+  queueItems,
   mergeExtracted,
   openItems,
   recordHeard,
@@ -92,9 +95,9 @@ describe('finishTrip', () => {
   });
 });
 
-describe('geofence handlers', () => {
-  const listed = () => add(withStore(), 'we need eggs and milk');
+const listed = () => add(withStore(), 'we need eggs and milk');
 
+describe('geofence handlers', () => {
   it('reminds on enter, then respects the cooldown', () => {
     const first = handleEnter(listed(), 's1', NOW);
     expect(first.reminder?.items.map((i) => i.name)).toEqual(['eggs', 'milk']);
@@ -124,6 +127,65 @@ describe('geofence handlers', () => {
     expect(driveBy.trip).toBeUndefined();
     expect(openItems(driveBy.state.items)).toHaveLength(2);
     expect(handleExit(listed(), 's1', NOW + MIN_DWELL_MS * 2).trip).toBeUndefined();
+  });
+});
+
+describe('leaving a store with "send leftovers to my cart" on', () => {
+  const withCart = () => {
+    const s = listed();
+    return { ...s, settings: { ...s.settings, leftoversToCart: true } };
+  };
+
+  it('asks instead of moving leftovers', () => {
+    const entered = handleEnter(withCart(), 's1', NOW).state;
+    const out = handleExit(entered, 's1', NOW + MIN_DWELL_MS + 1);
+    expect(out.trip).toBeUndefined();
+    expect(out.prompt?.items.map((i) => i.name)).toEqual(['eggs', 'milk']);
+    expect(openItems(out.state.items)).toHaveLength(2);
+  });
+
+  it('files bought items in history and does not ask when nothing is left', () => {
+    const base = withCart();
+    const bought = { ...base, items: base.items.map((i) => ({ ...i, status: 'bought' as const })) };
+    const entered = handleEnter(bought, 's1', NOW).state;
+    const out = handleExit(entered, 's1', NOW + MIN_DWELL_MS + 1);
+    expect(out.prompt).toBeUndefined();
+    expect(out.state.items).toHaveLength(0);
+    expect(out.state.history).toHaveLength(2);
+  });
+
+  it('words the notification with the store and the remaining items', () => {
+    const entered = handleEnter(withCart(), 's1', NOW).state;
+    const out = handleExit(entered, 's1', NOW + MIN_DWELL_MS + 1);
+    expect(leftoverPromptText(out.prompt!)).toEqual({
+      title: 'You left Kroger',
+      body: '2 items remaining: eggs, milk. Move to cart now?',
+    });
+  });
+});
+
+describe('queueItems', () => {
+  it('queues only the named open items', () => {
+    const s = listed();
+    const out = queueItems(s, [s.items[0].id], NOW + 5);
+    expect(out.items.map((i) => i.status)).toEqual(['queued', 'open']);
+    expect(out.items[0].resolvedAt).toBe(NOW + 5);
+  });
+});
+
+describe('orderQueuedItem', () => {
+  it('moves one queued item into history and leaves the rest queued', () => {
+    const s = listed();
+    const queuedAll = queueItems(queueItems(s, [s.items[0].id], NOW), [s.items[1].id], NOW);
+    const out = orderQueuedItem(queuedAll, queuedAll.items[0].id, NOW + 9);
+    expect(out.items.map((i) => i.name)).toEqual(['milk']);
+    expect(out.history.map((i) => i.name)).toEqual(['eggs']);
+    expect(out.history[0].resolvedAt).toBe(NOW + 9);
+  });
+
+  it('ignores items that are not queued', () => {
+    const s = listed();
+    expect(orderQueuedItem(s, s.items[0].id, NOW)).toBe(s);
   });
 });
 

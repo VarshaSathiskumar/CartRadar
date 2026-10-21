@@ -4,14 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../components/AuthProvider';
 import { useTheme } from '../components/theme';
 import { Button, Muted } from '../components/ui';
-import { requestCode, verifyCode } from '../services/auth';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
+import { googleSignInAvailable, googleWebClientId, requestEmailCode, signInWithGoogle, verifyEmailCode } from '../services/auth';
 
 export default function LoginScreen() {
   const t = useTheme();
   const { signedIn } = useAuth();
   const [step, setStep] = useState<'details' | 'code'>('details');
   const [name, setName] = useState('');
-  const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,12 +31,14 @@ export default function LoginScreen() {
 
   const sendCode = () =>
     run(async () => {
-      await requestCode(mobile, email);
+      await requestEmailCode(email);
       setCode('');
       setStep('code');
     });
 
-  const verify = () => run(async () => signedIn(await verifyCode({ mobile, email, code, name: name.trim() || undefined })));
+  const google = (idToken: string) => run(async () => signedIn(await signInWithGoogle(idToken)));
+
+  const verify = () => run(async () => signedIn(await verifyEmailCode({ email, code, name: name.trim() || undefined })));
 
   const input = [styles.input, { color: t.text, borderColor: t.border, backgroundColor: t.card }];
 
@@ -46,15 +48,24 @@ export default function LoginScreen() {
         <Text style={styles.logo}>🛒</Text>
         <Text style={[styles.title, { color: t.text }]}>CartRadar</Text>
         <Muted style={{ textAlign: 'center', marginBottom: 24 }}>
-          {step === 'details' ? 'Sign in with your mobile number and email. We will send you a code.' : `Enter the 6-digit code we sent to ${mobile} and ${email}.`}
+          {step === 'details' ? 'Sign in with your email. We will send you a code.' : `Enter the 6-digit code we sent to ${email}.`}
         </Muted>
 
         {step === 'details' ? (
           <>
             <TextInput value={name} onChangeText={setName} placeholder="Your name (new accounts)" placeholderTextColor={t.muted} autoComplete="name" style={input} />
-            <TextInput value={mobile} onChangeText={setMobile} placeholder="Mobile number" placeholderTextColor={t.muted} keyboardType="phone-pad" autoComplete="tel" style={input} />
             <TextInput value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={t.muted} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" style={input} />
-            <Button label={busy ? 'Sending...' : 'Send code'} onPress={() => void sendCode()} disabled={busy || !mobile.trim() || !email.trim()} />
+            <Button label={busy ? 'Sending...' : 'Send code'} onPress={() => void sendCode()} disabled={busy || !email.trim()} />
+            {googleSignInAvailable && (
+              <>
+                <View style={styles.or}>
+                  <View style={[styles.rule, { backgroundColor: t.border }]} />
+                  <Muted>or</Muted>
+                  <View style={[styles.rule, { backgroundColor: t.border }]} />
+                </View>
+                <GoogleSignInButton clientId={googleWebClientId} onIdToken={(token) => void google(token)} onError={setError} />
+              </>
+            )}
           </>
         ) : (
           <>
@@ -73,7 +84,6 @@ export default function LoginScreen() {
               <Button label="Resend code" kind="secondary" onPress={() => void sendCode()} disabled={busy} />
               <Button label="Change details" kind="secondary" onPress={() => setStep('details')} disabled={busy} />
             </View>
-            {__DEV__ && <Muted style={{ textAlign: 'center', marginTop: 12 }}>Dev mode: the code is printed in the terminal running the auth service.</Muted>}
           </>
         )}
         {error && <Text style={[styles.error, { color: t.danger }]}>{error}</Text>}
@@ -89,6 +99,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 30, fontWeight: '800', textAlign: 'center' },
   input: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 16 },
   code: { fontSize: 24, letterSpacing: 8, textAlign: 'center' },
+  or: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
+  rule: { flex: 1, height: StyleSheet.hairlineWidth },
   links: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 4 },
   error: { textAlign: 'center', fontWeight: '600', marginTop: 6 },
 });

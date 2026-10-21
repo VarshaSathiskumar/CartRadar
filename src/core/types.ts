@@ -15,6 +15,8 @@ export interface ListItem {
   /** How many trips this item has survived without being bought. */
   carriedOver: number;
   resolvedAt?: number;
+  /** Epoch ms of the last change, stamped by the store; decides which device wins when syncing. */
+  updatedAt?: number;
 }
 
 export interface Utterance {
@@ -24,8 +26,6 @@ export interface Utterance {
   at: number;
   speaker?: string;
 }
-
-export type CartProviderId = 'amazon-fresh' | 'instacart' | 'walmart';
 
 export interface Settings {
   zip: string;
@@ -39,7 +39,6 @@ export interface Settings {
    * true: unbought items are queued for the shopping app.
    */
   leftoversToCart: boolean;
-  cartProvider: CartProviderId;
   remindersEnabled: boolean;
   demoMode: boolean;
 }
@@ -76,13 +75,20 @@ export interface PersistedState {
   visits: Record<string, number>;
   /** Epoch ms of the last completed trip. */
   lastTripAt?: number;
+  /** Cloud sync bookkeeping (see core/sync.ts). Item id to the epoch ms it was removed. */
+  tombstones: Record<string, number>;
+  /** Epoch ms settings or stores last changed. */
+  prefsUpdatedAt?: number;
+  /** Epoch ms the last cloud sync started; everything changed after it still needs uploading. */
+  cloudSyncedAt?: number;
+  /** The account this device's data was synced with, so another account never inherits it. */
+  cloudUserId?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   zip: '',
   geofenceRadiusM: 250,
   leftoversToCart: false,
-  cartProvider: 'amazon-fresh',
   remindersEnabled: true,
   demoMode: false,
 };
@@ -96,4 +102,5 @@ export const EMPTY_STATE: PersistedState = {
   seenUtteranceIds: [],
   lastNotifiedAt: {},
   visits: {},
+  tombstones: {},
 };

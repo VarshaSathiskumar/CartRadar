@@ -163,6 +163,8 @@ export interface GeofenceDecision {
   reminder?: { store: Store; items: ListItem[] };
   /** Set when leaving the store ended a shopping trip. */
   trip?: TripOutcome & { store: Store };
+  /** Set when the user left with items still open and "send leftovers to my cart" is on: ask before moving them. */
+  prompt?: { store: Store; items: ListItem[] };
 }
 
 /** Pure handler for a geofence enter event. */
@@ -192,8 +194,41 @@ export function handleExit(state: PersistedState, storeId: string, now: number):
   if (!store || enteredAt === undefined || now - enteredAt < MIN_DWELL_MS) return { state: next };
   if (state.items.length === 0) return { state: next };
 
+  if (state.settings.leftoversToCart) {
+    // Don't move leftovers silently: bought items go to history, the rest stay open and the user is asked.
+    const bought = state.items.filter((i) => i.status === 'bought');
+    const leftovers = openItems(state.items);
+    const settled: PersistedState = {
+      ...next,
+      items: state.items.filter((i) => i.status !== 'bought'),
+      history: [...bought, ...state.history].slice(0, HISTORY_CAP),
+      lastTripAt: now,
+    };
+    return leftovers.length ? { state: settled, prompt: { store, items: leftovers } } : { state: settled };
+  }
+
   const trip = finishTrip(next, now);
   return { state: trip.state, trip: { ...trip, store } };
+}
+
+/** Moves the given open items to the cart queue, as if the user had said yes to "move to cart now?". */
+export function queueItems(state: PersistedState, ids: string[], now: number): PersistedState {
+  const wanted = new Set(ids);
+  return {
+    ...state,
+    items: state.items.map((i) => (wanted.has(i.id) && i.status === 'open' ? { ...i, status: 'queued' as const, resolvedAt: now } : i)),
+  };
+}
+
+/** Takes one item out of the cart queue once the user has added it to their Amazon Fresh cart. */
+export function orderQueuedItem(state: PersistedState, id: string, now: number): PersistedState {
+  const item = state.items.find((i) => i.id === id && i.status === 'queued');
+  if (!item) return state;
+  return {
+    ...state,
+    items: state.items.filter((i) => i.id !== id),
+    history: [{ ...item, resolvedAt: now }, ...state.history].slice(0, HISTORY_CAP),
+  };
 }
 
 export function reminderText(store: Store, items: ListItem[]): { title: string; body: string } {
@@ -206,11 +241,21 @@ export function reminderText(store: Store, items: ListItem[]): { title: string; 
   };
 }
 
-export function tripText(t: TripOutcome & { store: Store }, providerLabel: string): { title: string; body: string } | undefined {
+export function leftoverPromptText(p: { store: Store; items: ListItem[] }): { title: string; body: string } {
+  const names = p.items.map((i) => i.name);
+  const shown = names.slice(0, 4).join(', ');
+  const more = names.length > 4 ? ` +${names.length - 4} more` : '';
+  return {
+    title: `You left ${p.store.name}`,
+    body: `${p.items.length} ${p.items.length === 1 ? 'item' : 'items'} remaining: ${shown}${more}. Move to cart now?`,
+  };
+}
+
+export function tripText(t: TripOutcome & { store: Store }): { title: string; body: string } | undefined {
   if (t.queued.length) {
     return {
       title: `${t.queued.length} left over from ${t.store.name}`,
-      body: `Ready to add to your ${providerLabel} cart. Tap to review.`,
+      body: 'Ready to add to your Amazon Fresh cart. Tap to review.',
     };
   }
   if (t.carried.length) {

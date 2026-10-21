@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import { Tabs, router } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, AppState, Text, View } from 'react-native';
@@ -6,12 +5,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { syncFromBee } from '../bee/sync';
 import { AuthProvider, useAuth } from '../components/AuthProvider';
 import { PhoneFrame } from '../components/PhoneFrame';
-import { queuedItems } from '../core/listLogic';
+import { queueItems, queuedItems } from '../core/listLogic';
 import { useTheme } from '../components/theme';
 import { registerBackgroundSync } from '../services/background';
 import '../services/geofence'; // registers the geofence task with the OS
-import { configureNotifications } from '../services/notifications';
-import { loadState, useAppState } from '../services/store';
+import { configureNotifications, KEEP_ON_LIST_ACTION, MOVE_TO_CART_ACTION, onNotificationResponse } from '../services/notifications';
+import { loadState, mutate, useAppState } from '../services/store';
 
 configureNotifications();
 
@@ -42,13 +41,19 @@ function AppTabs() {
       if (next !== 'active') return;
       void loadState().then(() => syncFromBee().catch(() => undefined));
     });
-    const tap = Notifications.addNotificationResponseReceivedListener((r) => {
-      const screen = r.notification.request.content.data?.screen;
-      router.navigate(screen === 'cart' ? '/cart' : '/');
+    const stopListening = onNotificationResponse((r) => {
+      const data = r.notification.request.content.data;
+      if (r.actionIdentifier === KEEP_ON_LIST_ACTION) return;
+      if (r.actionIdentifier === MOVE_TO_CART_ACTION) {
+        const ids = Array.isArray(data?.itemIds) ? data.itemIds.filter((id: unknown): id is string => typeof id === 'string') : [];
+        void mutate((s) => queueItems(s, ids, Date.now())).then(() => router.navigate('/cart'));
+        return;
+      }
+      router.navigate(data?.screen === 'cart' ? '/cart' : '/');
     });
     return () => {
       sub.remove();
-      tap.remove();
+      stopListening();
     };
   }, []);
 

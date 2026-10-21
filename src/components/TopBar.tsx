@@ -4,17 +4,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from './theme';
 
 /** Greeting on the left, tappable location chip on the right (opens the Location settings). */
-export function TopBar({ name, subtitle, location }: { name: string; subtitle: string; location: string }) {
+export function TopBar({ name, subtitle, location }: { name?: string; subtitle: string; location: string }) {
   const t = useTheme();
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: t.card, borderBottomColor: t.border, borderBottomWidth: StyleSheet.hairlineWidth }}>
       <View style={s.row}>
         <View style={[s.avatar, { backgroundColor: t.accent }]}>
-          <Text style={{ color: t.accentText, fontWeight: '800', fontSize: 16 }}>{name.charAt(0).toUpperCase()}</Text>
+          <Text style={{ color: t.accentText, fontWeight: '800', fontSize: 16 }}>{name ? name.charAt(0).toUpperCase() : '🛒'}</Text>
         </View>
         <View style={s.greeting}>
           <Text numberOfLines={1} style={[s.hi, { color: t.text }]}>
-            Hi, {name}
+            {name ? `Hi, ${name}` : 'Hi there'}
           </Text>
           <Text numberOfLines={1} style={{ color: t.muted, fontSize: 12 }}>
             {subtitle}

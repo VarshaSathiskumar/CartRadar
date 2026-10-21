@@ -6,8 +6,6 @@ import { useAuth } from '../components/AuthProvider';
 import { useTheme } from '../components/theme';
 import { Button, Card, Chip, Muted, Screen, SectionTitle, Toggle } from '../components/ui';
 import { updateSettings } from '../core/listLogic';
-import type { CartProviderId } from '../core/types';
-import { CART_PROVIDERS } from '../services/cart';
 import { clearBeeToken, getBeeToken, setBeeToken } from '../services/secrets';
 import { mutate, useAppState } from '../services/store';
 
@@ -60,8 +58,7 @@ export default function SettingsScreen() {
             <SectionTitle>Account</SectionTitle>
             <Card>
               {user.name && <Text style={[styles.label, { color: t.text }]}>{user.name}</Text>}
-              <Muted>{user.email}</Muted>
-              <Muted style={{ marginBottom: 10 }}>{user.mobile}</Muted>
+              <Muted style={{ marginBottom: 10 }}>{user.email}</Muted>
               <Button label="Sign out" kind="secondary" onPress={() => void signOut()} />
             </Card>
           </>
@@ -135,22 +132,12 @@ export default function SettingsScreen() {
             title="Send leftovers to my cart"
             description={
               settings.leftoversToCart
-                ? `When you leave a store, anything not checked off goes to your Cart queue so you can order it from ${CART_PROVIDERS[settings.cartProvider].label}.`
+                ? `When you leave a store with items left, you get a notification asking whether to move them to your Cart queue, where you can order them from Amazon Fresh.`
                 : 'When you leave a store, anything not checked off stays on your list for the next trip.'
             }
             value={settings.leftoversToCart}
             onChange={(v) => void patch({ leftoversToCart: v })}
           />
-          {settings.leftoversToCart && (
-            <View style={{ marginTop: 12 }}>
-              <Text style={[styles.label, { color: t.text }]}>Shopping app</Text>
-              <View style={styles.rowGap}>
-                {(Object.keys(CART_PROVIDERS) as CartProviderId[]).map((id) => (
-                  <Chip key={id} label={CART_PROVIDERS[id].label} selected={settings.cartProvider === id} onPress={() => void patch({ cartProvider: id })} />
-                ))}
-              </View>
-            </View>
-          )}
         </Card>
       </ScrollView>
     </Screen>
