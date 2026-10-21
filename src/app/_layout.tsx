@@ -4,7 +4,7 @@ import { ActivityIndicator, AppState, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { syncFromBee } from '../bee/sync';
 import { AuthProvider, useAuth } from '../components/AuthProvider';
-import { PhoneFrame } from '../components/PhoneFrame';
+import { AppShell } from '../components/AppShell';
 import { queueItems, queuedItems } from '../core/listLogic';
 import { useTheme } from '../components/theme';
 import { registerBackgroundSync } from '../services/background';
@@ -21,9 +21,9 @@ const icon = (glyph: string) => () => <Text style={{ fontSize: 20 }}>{glyph}</Te
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <PhoneFrame>
+      <AppShell>
         <AppTabs />
-      </PhoneFrame>
+      </AppShell>
     </AuthProvider>
   );
 }
