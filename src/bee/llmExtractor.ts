@@ -1,9 +1,10 @@
 import { canonicalName } from '../core/lexicon';
 import type { ExtractedItem } from '../core/extractor';
 import type { Utterance } from '../core/types';
+import { callFunction } from '../services/functions';
+import { supabaseEnabled } from '../services/supabase';
 
-const TIMEOUT_MS = 30_000;
-/** The service accepts at most 60 lines per request, so longer backlogs are sent in batches. */
+/** The function accepts at most 60 lines per request, so longer backlogs are sent in batches. */
 const BATCH_SIZE = 50;
 
 interface ServerItem {
@@ -13,39 +14,22 @@ interface ServerItem {
 }
 
 /**
- * Asks the local extraction service (server/extract.ts) which items the speakers mean to buy.
- * Returns items grouped by the id of the utterance that evidences them, or undefined when the
- * service is not configured or any batch fails, so the caller can fall back to the rule-based extractor.
+ * Asks the extract-items Edge Function which items the speakers mean to buy.
+ * Returns items grouped by the id of the utterance that evidences them, or undefined when there is
+ * nothing to ask or no cloud account, so the caller can fall back to the rule-based extractor.
+ * Throws when the function itself fails, so a sync can report it instead of silently reading worse.
  */
 export async function extractWithLlm(utterances: Utterance[]): Promise<Map<string, ExtractedItem[]> | undefined> {
-  const url = process.env.EXPO_PUBLIC_EXTRACT_URL;
-  if (!url || utterances.length === 0) return undefined;
+  if (!supabaseEnabled || utterances.length === 0) return undefined;
 
   const byUtterance = new Map<string, ExtractedItem[]>();
   for (let i = 0; i < utterances.length; i += BATCH_SIZE) {
-    const batch = await extractBatch(url, utterances.slice(i, i + BATCH_SIZE));
-    if (!batch) return undefined;
-    for (const [id, items] of batch) byUtterance.set(id, items);
-  }
-  return byUtterance;
-}
-
-async function extractBatch(url: string, utterances: Utterance[]): Promise<Map<string, ExtractedItem[]> | undefined> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(`${url}/extract`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ utterances: utterances.map((u) => ({ text: u.text, speaker: u.speaker })) }),
-      signal: controller.signal,
+    const batch = utterances.slice(i, i + BATCH_SIZE);
+    const { items } = await callFunction<{ items: ServerItem[] }>('extract-items', {
+      utterances: batch.map((u) => ({ text: u.text, speaker: u.speaker })),
     });
-    if (!res.ok) return undefined;
-
-    const { items } = (await res.json()) as { items: ServerItem[] };
-    const byUtterance = new Map<string, ExtractedItem[]>();
     for (const item of items) {
-      const source = utterances[item.utterance_index];
+      const source = batch[item.utterance_index];
       if (!source) continue;
       const list = byUtterance.get(source.id) ?? [];
       list.push({
@@ -56,10 +40,6 @@ async function extractBatch(url: string, utterances: Utterance[]): Promise<Map<s
       });
       byUtterance.set(source.id, list);
     }
-    return byUtterance;
-  } catch {
-    return undefined;
-  } finally {
-    clearTimeout(timer);
   }
+  return byUtterance;
 }

@@ -1,0 +1,9 @@
+project_id = "cartradar"
+
+# The gateway JWT check is off because the functions verify the caller themselves (see _shared/auth.ts),
+# which also works with projects that use asymmetric JWT signing keys.
+[functions.bee-sync]
+verify_jwt = false
+
+[functions.extract-items]
+verify_jwt = false

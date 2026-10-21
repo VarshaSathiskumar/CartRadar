@@ -1,7 +1,8 @@
 import * as Crypto from 'expo-crypto';
-import { useRef, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { syncFromBee } from '../bee/sync';
+import { useSyncStatus } from '../bee/syncStatus';
 import { useTheme } from '../components/theme';
 import { useAuth } from '../components/AuthProvider';
 import { BottomSheet } from '../components/BottomSheet';
@@ -21,6 +22,7 @@ export default function ListScreen() {
   const { state } = useAppState();
   const [draft, setDraft] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const sync = useSyncStatus();
   const [moved, setMoved] = useState<ListItem | undefined>();
   const movedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -47,7 +49,9 @@ export default function ListScreen() {
   // Device-based lookup only until a zip is chosen; after that the map belongs to the zip area.
   const usingDevice = !state.settings.zip && !state.settings.centre;
   const nearby = useNearbyStores(state.stores.length || !usingDevice ? undefined : coords);
-  const mapStores = state.stores.length ? state.stores : usingDevice ? nearby : [];
+  // Stores switched off in Location settings stay saved but are not shown on the map.
+  // Memoised because the map redraws and re-fits itself whenever this array changes.
+  const mapStores = useMemo(() => (state.stores.length ? state.stores : usingDevice ? nearby : []).filter((st) => st.enabled), [state.stores, usingDevice, nearby]);
   // A zip code from Location settings moves the map there instead of to the device position.
   // Settings saved before the centre was stored fall back to the middle of the saved stores.
   const zipCentre =
@@ -69,8 +73,8 @@ export default function ListScreen() {
     setRefreshing(true);
     try {
       await syncFromBee();
-    } catch (e) {
-      Alert.alert("Couldn't reach Bee", e instanceof Error ? e.message : 'Unknown error');
+    } catch {
+      // The error is shown under the input (Alert.alert does nothing in the browser).
     } finally {
       setRefreshing(false);
     }
@@ -91,9 +95,16 @@ export default function ListScreen() {
 
   const endTrip = () => {
     const where = state.settings.leftoversToCart ? `your ${AMAZON_FRESH_LABEL} cart queue` : 'your next list';
-    Alert.alert('Finish trip?', `${open.length} unchecked ${open.length === 1 ? 'item moves' : 'items move'} to ${where}.`, [
+    const message = `${open.length} unchecked ${open.length === 1 ? 'item moves' : 'items move'} to ${where}.`;
+    const finish = () => void mutate((s) => finishTrip(s, Date.now()).state);
+    // Alert.alert does nothing in the browser, so the web build asks with the browser's own dialog.
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Finish trip? ${message}`)) finish();
+      return;
+    }
+    Alert.alert('Finish trip?', message, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Finish', onPress: () => void mutate((s) => finishTrip(s, Date.now()).state) },
+      { text: 'Finish', onPress: finish },
     ]);
   };
 
@@ -117,6 +128,20 @@ export default function ListScreen() {
               />
               <Button label="Add" onPress={addManual} disabled={!draft.trim()} />
             </View>
+
+            {sync.phase === 'syncing' && (
+              <View style={styles.notice}>
+                <Muted style={{ flex: 1 }}>Syncing with Bee...</Muted>
+              </View>
+            )}
+            {sync.phase === 'error' && (
+              <View style={styles.notice}>
+                <Text style={{ flex: 1, color: t.danger, fontSize: 13 }}>Bee sync failed: {sync.message}</Text>
+                <Pressable accessibilityRole="button" onPress={() => void refresh()} hitSlop={8}>
+                  <Text style={{ color: t.accent, fontWeight: '700' }}>Retry</Text>
+                </Pressable>
+              </View>
+            )}
 
             {moved && (
             <View style={styles.notice}>

@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { router } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { syncFromBee } from '../bee/sync';
+import { useSyncStatus } from '../bee/syncStatus';
 import { useAuth } from '../components/AuthProvider';
 import { useTheme } from '../components/theme';
-import { Button, Card, Chip, Muted, Screen, SectionTitle, Toggle } from '../components/ui';
+import { Button, Card, Muted, Screen, SectionTitle, Toggle } from '../components/ui';
 import { updateSettings } from '../core/listLogic';
 import { disableDemo, enableDemo } from '../services/demo';
-import { clearBeeToken, getBeeToken, setBeeToken } from '../services/secrets';
 import { mutate, useAppState } from '../services/store';
 
 export default function SettingsScreen() {
@@ -16,28 +16,14 @@ export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { settings, stores } = state;
 
-  const [token, setToken] = useState('');
-  const [rescan, setRescan] = useState<{ busy: boolean; message?: string }>({ busy: false });
-  const [hasToken, setHasToken] = useState(false);
+  const sync = useSyncStatus();
   const [demo, setDemo] = useState<{ busy: boolean; message?: string }>({ busy: false });
-
-  useEffect(() => {
-    void getBeeToken().then((v) => setHasToken(!!v));
-  }, []);
 
   const patch = (p: Parameters<typeof updateSettings>[1]) => mutate((s) => updateSettings(s, p));
 
-  // Forgets which lines were already read so the current extractor re-reads recent conversations.
-  const rescanConversations = async () => {
-    setRescan({ busy: true });
-    try {
-      await mutate((s) => ({ ...s, seenUtteranceIds: [] }));
-      const r = await syncFromBee();
-      setRescan({ busy: false, message: r.added.length ? `Added ${r.added.map((i) => i.name).join(', ')}.` : `Read ${r.processed} lines, nothing new to add.` });
-    } catch (e) {
-      setRescan({ busy: false, message: e instanceof Error ? e.message : 'Re-scan failed' });
-    }
-  };
+  // Progress and errors show in the status line below, which every sync (manual or automatic) updates.
+  const syncNow = (full: boolean) => void syncFromBee({ full }).catch(() => undefined);
+  const syncing = sync.phase === 'syncing';
 
   // Demo mode fills the profile with mock conversations (and saves them like real data); turning it off clears them again.
   const toggleDemo = async (on: boolean) => {
@@ -59,19 +45,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const saveToken = async () => {
-    if (!token.trim()) return;
-    await setBeeToken(token);
-    setToken('');
-    setHasToken(true);
-    try {
-      const r = await syncFromBee();
-      Alert.alert('Connected', `Checked ${r.processed} new lines of conversation.`);
-    } catch (e) {
-      Alert.alert('Saved, but Bee didn’t respond', e instanceof Error ? e.message : 'Unknown error');
-    }
-  };
-
   return (
     <Screen title="Settings">
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
@@ -88,31 +61,16 @@ export default function SettingsScreen() {
 
         <SectionTitle>Bee wearable</SectionTitle>
         <Card>
-          <Text style={[styles.label, { color: t.text }]}>{hasToken || process.env.EXPO_PUBLIC_BEE_PROXY_URL ? 'Connected' : 'Not connected'}</Text>
-          <TextInput
-            value={token}
-            onChangeText={setToken}
-            placeholder={hasToken ? 'Paste a new access token to replace' : 'Paste your Bee access token'}
-            placeholderTextColor={t.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-            style={[styles.input, { color: t.text, borderColor: t.border }]}
-          />
+          <Text style={[styles.label, { color: t.text }]}>Synced through your CartRadar server</Text>
+          <Muted style={{ marginBottom: 10 }}>
+            {state.lastSyncAt ? `Last synced ${new Date(state.lastSyncAt).toLocaleString()}.` : 'Not synced yet.'} Pull down on the list to sync too.
+          </Muted>
           <View style={styles.rowGap}>
-            <Button label="Save token" onPress={() => void saveToken()} disabled={!token.trim()} />
-            {hasToken && (
-              <Button
-                label="Disconnect"
-                kind="secondary"
-                onPress={() => void clearBeeToken().then(() => setHasToken(false))}
-              />
-            )}
+            <Button label={syncing ? 'Syncing...' : 'Sync now'} onPress={() => syncNow(false)} disabled={syncing} />
+            <Button label="Re-scan recent conversations" kind="secondary" onPress={() => syncNow(true)} disabled={syncing} />
           </View>
-          <View style={{ marginTop: 10 }}>
-            <Button label={rescan.busy ? 'Re-scanning…' : 'Re-scan recent conversations'} kind="secondary" onPress={() => void rescanConversations()} disabled={rescan.busy} />
-            {rescan.message && <Muted style={{ marginTop: 6 }}>{rescan.message}</Muted>}
-          </View>
+          {sync.phase === 'done' && <Muted style={{ marginTop: 8 }}>{sync.message}</Muted>}
+          {sync.phase === 'error' && <Text style={{ color: t.danger, marginTop: 8, fontSize: 13 }}>Sync failed: {sync.message}</Text>}
         </Card>
         <Card>
           <Toggle
@@ -170,7 +128,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  input: { borderWidth: 1, borderRadius: 10, padding: 10, fontSize: 16, marginBottom: 10 },
   rowGap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 });

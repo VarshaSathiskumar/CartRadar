@@ -14,6 +14,8 @@ import { loadState, mutate, useAppState } from '../services/store';
 
 configureNotifications();
 
+const POLL_MS = 5 * 60_000;
+
 const icon = (glyph: string) => () => <Text style={{ fontSize: 20 }}>{glyph}</Text>;
 
 export default function RootLayout() {
@@ -35,11 +37,6 @@ function AppTabs() {
   useEffect(() => {
     void loadState().then(() => {
       void registerBackgroundSync().catch(() => undefined);
-      void syncFromBee().catch(() => undefined);
-    });
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') return;
-      void loadState().then(() => syncFromBee().catch(() => undefined));
     });
     const stopListening = onNotificationResponse((r) => {
       const data = r.notification.request.content.data;
@@ -51,11 +48,26 @@ function AppTabs() {
       }
       router.navigate(data?.screen === 'cart' ? '/cart' : '/');
     });
+    return stopListening;
+  }, []);
+
+  // Bee sync runs as the signed-in user, so it waits for the session. Failures show in the sync status.
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    const run = () => void loadState().then(() => syncFromBee().catch(() => undefined));
+    run();
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') run();
+    });
+    // While the app is open, check again every few minutes. Ticks with nothing new cost no model call.
+    const timer = setInterval(() => {
+      if (AppState.currentState === 'active') run();
+    }, POLL_MS);
     return () => {
       sub.remove();
-      stopListening();
+      clearInterval(timer);
     };
-  }, []);
+  }, [status]);
 
   if (status === 'loading') {
     return (

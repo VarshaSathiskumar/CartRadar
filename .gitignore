@@ -42,3 +42,6 @@ yarn-error.*
 
 # Local Postgres cluster
 .pgdata/
+
+# Edge Function secrets (pushed with `supabase secrets set`)
+supabase/functions/.env

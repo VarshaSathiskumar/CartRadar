@@ -9,7 +9,7 @@ export interface DemoResult {
   /** Demo items now on the profile (list, cart queue and history). */
   items: number;
   conversations: number;
-  /** False when the extraction service was unreachable and the simpler built-in reader was used. */
+  /** False when the extraction function was unreachable and the simpler built-in reader was used. */
   usedModel: boolean;
 }
 
@@ -27,7 +27,7 @@ export async function enableDemo(): Promise<DemoResult> {
   }
 
   // One request per conversation, so the model never mixes up "it" across unrelated talks.
-  const read = await Promise.all(plan.map((entry) => extractWithLlm(entry.utterances)));
+  const read = await Promise.all(plan.map((entry) => extractWithLlm(entry.utterances).catch(() => undefined)));
   const usedModel = read.every((r) => r !== undefined);
 
   let counter = 0;

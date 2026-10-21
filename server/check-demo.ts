@@ -1,27 +1,21 @@
+import OpenAI from 'openai';
 import { DEMO_CONVERSATIONS } from '../src/core/demoConversations.ts';
+import { extract } from '../supabase/functions/extract-items/extract.ts';
 
 /**
- * Sends each demo conversation to the extraction service and checks the model finds the expected
- * items and skips the ones that were ruled out.
- * Run (service must be up): npm run check-demo
+ * Runs each demo conversation through the same extraction code the extract-items function uses and checks
+ * the model finds the expected items and skips the ones that were ruled out.
+ * Run: npm run check-demo (reads OPENAI_API_KEY and OPENAI_MODEL from .env.local)
  */
-const url = `http://127.0.0.1:${process.env.EXTRACT_PORT || 8788}/extract`;
+const client = new OpenAI();
+const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 let found = 0;
 let missed = 0;
 let wrong = 0;
 
 const results = await Promise.all(
-  DEMO_CONVERSATIONS.map(async (c) => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ utterances: c.lines.map(([speaker, text]) => ({ speaker, text })) }),
-    });
-    const json = (await res.json()) as { items?: { name: string; quantity: string }[]; error?: string };
-    if (!res.ok) throw new Error(`${c.id}: ${res.status} ${json.error}`);
-    return { c, items: json.items ?? [] };
-  }),
+  DEMO_CONVERSATIONS.map(async (c) => ({ c, items: await extract(client, model, c.lines.map(([speaker, text]) => ({ speaker, text }))) })),
 );
 
 for (const { c, items } of results) {

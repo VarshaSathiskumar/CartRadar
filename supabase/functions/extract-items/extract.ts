@@ -1,20 +1,12 @@
-import { createServer } from 'node:http';
-import OpenAI from 'openai';
-
 /**
- * Local extraction service. The app posts recent Bee utterances here and gets back the
- * grocery items the speakers mean to buy. The OpenAI key stays in this process
- * (read from OPENAI_API_KEY), never in the app bundle.
- *
- * Run: npm run extract (reads OPENAI_API_KEY from .env.local)
+ * Grocery extraction. The app posts recent Bee utterances to the extract-items function and gets back
+ * the grocery items the speakers mean to buy. Kept free of imports so the Node check scripts in server/
+ * can run the same prompt and validation against a local OpenAI client.
  */
 
-const PORT = Number(process.env.EXTRACT_PORT || 8788);
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const MAX_UTTERANCES = 60;
-const MAX_BODY_BYTES = 64_000;
+export const MAX_UTTERANCES = 60;
 
-const SYSTEM = `You build a grocery shopping list from transcripts of everyday conversation.
+export const SYSTEM = `You build a grocery shopping list from transcripts of everyday conversation.
 You get numbered utterances, oldest first. Return the grocery items the speakers intend to buy.
 
 Include an item when:
@@ -34,7 +26,7 @@ Rules:
 - "reason" is a short phrase quoting or paraphrasing why it was included.
 - List each item once. Return an empty list when nothing qualifies.`;
 
-const SCHEMA = {
+export const SCHEMA = {
   type: 'object',
   properties: {
     items: {
@@ -56,25 +48,28 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
-interface InUtterance {
+export interface InUtterance {
   text: string;
   speaker?: string;
 }
 
-interface OutItem {
+export interface OutItem {
   name: string;
   quantity: string;
   utterance_index: number;
   reason: string;
 }
 
-const client = new OpenAI();
+/** The part of the OpenAI client this needs, so tests can pass a fake. */
+export interface ChatClient {
+  chat: { completions: { create(params: any): Promise<any> } };
+}
 
-async function extract(utterances: InUtterance[]): Promise<OutItem[]> {
+export async function extract(client: ChatClient, model: string, utterances: InUtterance[]): Promise<OutItem[]> {
   const transcript = utterances.map((u, i) => `[${i}] ${u.speaker ?? 'Unknown'}: ${u.text}`).join('\n');
 
   const response = await client.chat.completions.create({
-    model: MODEL,
+    model,
     messages: [
       { role: 'system', content: SYSTEM },
       { role: 'user', content: transcript },
@@ -96,44 +91,3 @@ async function extract(utterances: InUtterance[]): Promise<OutItem[]> {
     return true;
   });
 }
-
-function readBody(req: import('node:http').IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => {
-      size += c.length;
-      if (size > MAX_BODY_BYTES) reject(new Error('body too large'));
-      else chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
-}
-
-createServer(async (req, res) => {
-  const send = (status: number, body: unknown) => {
-    res.writeHead(status, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    });
-    res.end(JSON.stringify(body));
-  };
-
-  if (req.method === 'OPTIONS') return send(204, {});
-  if (req.method !== 'POST' || req.url !== '/extract') return send(404, { error: 'not found' });
-
-  try {
-    const body = JSON.parse(await readBody(req)) as { utterances?: InUtterance[] };
-    const utterances = (body.utterances ?? []).filter((u) => typeof u.text === 'string' && u.text.trim());
-    if (utterances.length === 0) return send(200, { items: [] });
-    if (utterances.length > MAX_UTTERANCES) return send(400, { error: `at most ${MAX_UTTERANCES} utterances` });
-    return send(200, { items: await extract(utterances) });
-  } catch (e) {
-    if (e instanceof OpenAI.AuthenticationError) return send(401, { error: 'OpenAI rejected the API key' });
-    if (e instanceof OpenAI.RateLimitError) return send(429, { error: 'rate limited' });
-    if (e instanceof OpenAI.APIError) return send(502, { error: `OpenAI API error ${e.status}` });
-    return send(500, { error: e instanceof Error ? e.message : 'unknown error' });
-  }
-}).listen(PORT, '127.0.0.1', () => console.log(`Extraction service on http://127.0.0.1:${PORT}`));
