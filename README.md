@@ -20,30 +20,16 @@ CartRadar bridges that gap by turning conversational information into actionable
 
 ## Features
 
-**Bee-Powered Grocery Extraction**
-
-Retrieves recent conversations captured by Bee and identifies grocery items mentioned naturally.
-
-### 🧠 AI-Powered Understanding
-Uses OpenAI to extract grocery items, understand quantities, and identify purchase intent.
-
-### 🛒 Smart Shopping Lists
-Automatically deduplicates items, tracks purchased products, and preserves the conversation phrases that generated them.
-
-### 📍 Location-Based Reminders
-Uses nearby grocery store locations from OpenStreetMap to configure geofences on supported native devices.
-
-### 📦 Leftover Management
-After a shopping trip, unfinished items can remain on the grocery list or move to a separate Cart queue.
-
-### 🛍️ Retailer Hand-Off
-Opens prefilled product searches in Amazon Fresh. CartRadar does not automatically add products to retailer carts.
-
-### ☁️ Cloud Synchronization
-Uses Supabase to persist shopping lists across sessions.
-
-### 🎬 Demo Mode
-Includes scripted conversations for demonstrating the application without a Bee device.
+| Feature | Description |
+|---|---|
+| 🐝 Bee-Powered Grocery Extraction | Retrieves Bee conversations and identifies grocery items mentioned naturally. |
+| 🧠 AI-Powered Understanding | Uses OpenAI to extract grocery items, quantities, and purchase intent. |
+| 🛒 Smart Shopping Lists | Deduplicates items, tracks purchases, and preserves original conversation phrases. |
+| 📍 Location-Based Reminders | Uses OpenStreetMap to find nearby grocery stores and configure location-based reminders. |
+| 📦 Leftover Management | Keeps unfinished items on the grocery list or moves them to a separate Cart queue. |
+| 🛍️ Retailer Hand-Off | Opens prefilled Amazon Fresh product searches without automatically adding items to carts. |
+| ☁️ Cloud Synchronization | Uses Supabase to persist shopping lists across sessions. |
+| 🎬 Demo Mode | Provides scripted conversations to demonstrate the app without a Bee device. |
 
 ## How It Works
 
